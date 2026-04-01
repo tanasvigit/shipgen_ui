@@ -1,0 +1,109 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: shipgen_db
+    environment:
+      POSTGRES_USER: techliv
+      POSTGRES_PASSWORD: techliv
+      POSTGRES_DB: techliv
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U techliv -d techliv"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shipgen_network
+    # The postgres image automatically creates the database specified in POSTGRES_DB
+    # This ensures the database exists when the container starts
+
+  redis:
+    image: redis:7-alpine
+    container_name: shipgen_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shipgen_network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shipgen_api
+    environment:
+      # Database
+      DB_CONNECTION: postgresql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: techliv
+      DB_USERNAME: techliv
+      DB_PASSWORD: techliv
+      # JWT
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-CHANGE_ME_SECRET_KEY_IN_PRODUCTION}
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+      # App
+      APP_NAME: ShipGen API (FastAPI)
+      ENV: ${ENV:-development}
+      DEBUG: ${DEBUG:-true}
+      PORT: 9001
+      # Redis (optional)
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "9001:9001"
+    volumes:
+      - .:/app
+      - /app/alembic/versions
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Waiting for database and ensuring it exists...' &&
+        python scripts/wait-for-db.py &&
+        echo 'Database is ready. Running migrations...' &&
+        alembic upgrade head &&
+        echo 'Migrations complete. Starting FastAPI server...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 9001 --reload
+      "
+    networks:
+      - shipgen_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /app
+          ignore:
+            - .git
+            - __pycache__
+            - .venv
+        - action: rebuild
+          path: ./requirements.txt
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  shipgen_network:
+    driver: bridge
+

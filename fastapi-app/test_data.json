@@ -1,0 +1,173 @@
+{
+  "users": [
+    {
+      "uuid": "26368242-ac32-4b5e-90c0-a7dd03d58d78",
+      "email": "manager@test.techliv.net",
+      "password": "Test123!",
+      "name": "Test Manager"
+    },
+    {
+      "uuid": "739abf5b-0f95-45b2-81cc-0cd3ffc67787",
+      "email": "dispatcher@test.techliv.net",
+      "password": "Test123!",
+      "name": "Test Dispatcher"
+    },
+    {
+      "uuid": "c53a35c7-884d-47bb-a823-c97320ce018e",
+      "email": "driver@test.techliv.net",
+      "password": "Test123!",
+      "name": "Test Driver"
+    }
+  ],
+  "companies": [
+    {
+      "uuid": "1e1827e3-8f4a-451e-a968-334f52150e93",
+      "name": "Acme Logistics",
+      "public_id": "comp_3960d658f7f1"
+    },
+    {
+      "uuid": "11632820-9e9c-418e-9243-95c3f5c00744",
+      "name": "Global Shipping Co",
+      "public_id": "comp_0a5dab5cb2aa"
+    }
+  ],
+  "roles": [
+    {
+      "id": "acd9575a-cb43-4e1f-aa03-d9068dab3cb3",
+      "name": "fleet-manager"
+    },
+    {
+      "id": "c6895038-bcb8-466c-8f24-bcaabf953733",
+      "name": "dispatcher"
+    },
+    {
+      "id": "65c1c75a-1bb6-410d-a9a9-76a68b4d41eb",
+      "name": "driver"
+    }
+  ],
+  "permissions": [
+    {
+      "id": "b48ca2ca-4ef4-40e0-816d-7a528c15afe3",
+      "name": "orders.create"
+    },
+    {
+      "id": "446fa732-b9d9-49c7-afb7-49d4c3757e07",
+      "name": "orders.view"
+    },
+    {
+      "id": "ba4f237c-b27d-4762-aff2-1a616e15bde0",
+      "name": "orders.update"
+    },
+    {
+      "id": "f351dd29-b646-4052-98cc-74895b18e0d0",
+      "name": "drivers.manage"
+    },
+    {
+      "id": "82dd02f9-0265-43cd-a5af-b429dae0fd48",
+      "name": "vehicles.manage"
+    }
+  ],
+  "contacts": [
+    {
+      "uuid": "22fc7426-fc72-4e1e-bdd7-7636341eed48",
+      "name": "John Doe",
+      "email": "john.doe@example.com"
+    },
+    {
+      "uuid": "0c9a6fd6-55e4-4746-9cb9-7bb650727f9a",
+      "name": "Jane Smith",
+      "email": "jane.smith@example.com"
+    }
+  ],
+  "vendors": [
+    {
+      "uuid": "95f87958-0be5-43f0-b1e8-81fdb1ce5ada",
+      "name": "Fast Fuel Co",
+      "email": "contact@fastfuel.com"
+    },
+    {
+      "uuid": "37c20338-ff54-4d9f-b1e6-163793d0d6cb",
+      "name": "Quick Parts Supply",
+      "email": "sales@quickparts.com"
+    }
+  ],
+  "places": [
+    {
+      "uuid": "1add35c9-9833-4af1-a954-906c8955f600",
+      "name": "Main Warehouse",
+      "city": "New York"
+    },
+    {
+      "uuid": "ae7971b0-77e5-4c73-940e-b09387c98795",
+      "name": "Distribution Center",
+      "city": "Los Angeles"
+    }
+  ],
+  "drivers": [
+    {
+      "uuid": "deea431b-3fa7-4ce1-9837-51287357b24b",
+      "user_uuid": "5a99704f-4326-42fb-820f-9f4486f4a52c",
+      "license_number": "DL123456"
+    },
+    {
+      "uuid": "7425a16c-757c-460c-ba9f-b62224186e06",
+      "user_uuid": "37c3fd53-bcf4-4305-9814-554d13f8797c",
+      "license_number": "DL789012"
+    }
+  ],
+  "vehicles": [
+    {
+      "uuid": "f7dfba52-a49a-40b3-90bc-80a09467554b",
+      "make": "Ford",
+      "model": "Transit",
+      "plate_number": "ABC-1234"
+    },
+    {
+      "uuid": "9989d8ab-e3a4-4e87-b789-6a1d0bdfa3ad",
+      "make": "Ford",
+      "model": "F-150",
+      "plate_number": "XYZ-5678"
+    }
+  ],
+  "orders": [
+    {
+      "uuid": "54c566d9-83c1-4228-8ec5-32e82ebfaa86",
+      "internal_id": "ORD-001",
+      "status": "pending"
+    },
+    {
+      "uuid": "9d772791-ffb8-4822-9a79-a73e1877a2ad",
+      "internal_id": "ORD-002",
+      "status": "assigned"
+    }
+  ],
+  "service_rates": [
+    {
+      "uuid": "09ec8e46-8b91-4b05-8afe-f60155b1174a",
+      "service_name": "Standard Delivery",
+      "base_fee": 500
+    }
+  ],
+  "devices": [
+    {
+      "uuid": "410ae875-3aee-4b33-81b0-55f2015d0859",
+      "name": "GPS Tracker 1",
+      "model": "GPS-2024",
+      "device_id": "GPS-001"
+    }
+  ],
+  "storefront_customers": [
+    {
+      "name": "Retail Customer",
+      "email": "customer@example.com",
+      "phone": "+1555999999"
+    }
+  ],
+  "storefront_products": [
+    {
+      "uuid": "cb648e36-d2f4-4269-9e90-4cead64eb59a",
+      "name": "Test Product",
+      "price": 1999
+    }
+  ]
+}

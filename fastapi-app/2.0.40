@@ -1,0 +1,16 @@
+Collecting psycopg2-binary
+  Using cached psycopg2_binary-2.9.11-cp314-cp314-win_amd64.whl.metadata (5.1 kB)
+Collecting SQLAlchemy
+  Using cached sqlalchemy-2.0.48-cp314-cp314-win_amd64.whl.metadata (9.8 kB)
+Collecting greenlet>=1 (from SQLAlchemy)
+  Using cached greenlet-3.3.2-cp314-cp314-win_amd64.whl.metadata (3.8 kB)
+Collecting typing-extensions>=4.6.0 (from SQLAlchemy)
+  Using cached typing_extensions-4.15.0-py3-none-any.whl.metadata (3.3 kB)
+Using cached psycopg2_binary-2.9.11-cp314-cp314-win_amd64.whl (2.8 MB)
+Using cached sqlalchemy-2.0.48-cp314-cp314-win_amd64.whl (2.1 MB)
+Using cached greenlet-3.3.2-cp314-cp314-win_amd64.whl (232 kB)
+Using cached typing_extensions-4.15.0-py3-none-any.whl (44 kB)
+Installing collected packages: typing-extensions, psycopg2-binary, greenlet, SQLAlchemy
+
+
+Successfully installed SQLAlchemy-2.0.48 greenlet-3.3.2 psycopg2-binary-2.9.11 typing-extensions-4.15.0

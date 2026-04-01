@@ -1,0 +1,207 @@
+from fastapi import APIRouter
+
+from app.api.v1.routers import (
+    auth,
+    users,
+    companies,
+    fleetops_orders,
+    fleetops_order_flow,
+    fleetops_drivers,
+    fleetops_vehicles,
+    roles,
+    permissions,
+    policies,
+    twofa,
+    notifications,
+    fleetops_contacts,
+    fleetops_vendors,
+    fleetops_places,
+    service_rates,
+    service_quotes,
+    devices,
+    device_events,
+    telematics,
+    storefront_customers,
+    storefront_products,
+    storefront_carts,
+    storefront_orders,
+    fleetops_issues,
+    fleetops_fuel_reports,
+    fleetops_entities,
+    fleetops_payloads,
+    fleetops_zones,
+    fleetops_service_areas,
+    fleetops_fleets,
+    fleetops_tracking_numbers,
+    fleetops_tracking_statuses,
+    storefront_checkouts,
+    storefront_categories,
+    storefront_reviews,
+    storefront_food_trucks,
+    storefront_stores,
+    storefront_networks,
+    int_storefront_stores,
+    int_storefront_networks,
+    int_storefront_actions,
+    int_storefront_metrics,
+    int_storefront_orders,
+    int_storefront_store_hours,
+    int_storefront_product_hours,
+    int_storefront_product_variants,
+    int_storefront_product_variant_options,
+    int_storefront_product_addons,
+    int_storefront_product_addon_categories,
+    int_storefront_notification_channels,
+    int_storefront_votes,
+    int_storefront_catalogs,
+    int_storefront_catalog_hours,
+    int_storefront_customers,
+    int_storefront_products,
+    int_storefront_store_locations,
+    int_storefront_gateways,
+    int_storefront_reviews,
+    int_storefront_food_trucks,
+    int_storefront_addon_categories,
+    int_storefront_catalog_categories,
+    files,
+    comments,
+    settings,
+    webhook_endpoints,
+    webhook_request_logs,
+    dashboards,
+    dashboard_widgets,
+    reports,
+    chat_channels,
+    chat_messages,
+    chat_participants,
+    chat_attachments,
+    chat_receipts,
+    int_files,
+    int_comments,
+    int_chat_channels,
+    api_credentials,
+    api_events,
+    api_request_logs,
+    activities,
+    extensions,
+    custom_fields,
+    custom_field_values,
+    transactions,
+    schedules,
+    schedule_items,
+    schedule_templates,
+    schedule_availability,
+    schedule_constraints,
+    schedule_monitor,
+    groups,
+    user_devices,
+    lookup,
+    installer,
+    onboard,
+    registry,
+    me,
+)
+
+router = APIRouter()
+router.include_router(auth.router)
+router.include_router(me.router)
+router.include_router(users.router)
+router.include_router(companies.router)
+router.include_router(fleetops_orders.router)
+router.include_router(fleetops_order_flow.router)
+router.include_router(fleetops_drivers.router)
+router.include_router(fleetops_vehicles.router)
+router.include_router(roles.router)
+router.include_router(permissions.router)
+router.include_router(policies.router)
+router.include_router(twofa.router)
+router.include_router(notifications.router)
+router.include_router(fleetops_contacts.router)
+router.include_router(fleetops_vendors.router)
+router.include_router(fleetops_places.router)
+router.include_router(service_rates.router)
+router.include_router(service_quotes.router)
+router.include_router(devices.router)
+router.include_router(device_events.router)
+router.include_router(telematics.router)
+router.include_router(storefront_customers.router)
+router.include_router(storefront_products.router)
+router.include_router(storefront_carts.router)
+router.include_router(storefront_orders.router)
+router.include_router(fleetops_issues.router)
+router.include_router(fleetops_fuel_reports.router)
+router.include_router(fleetops_entities.router)
+router.include_router(fleetops_payloads.router)
+router.include_router(fleetops_zones.router)
+router.include_router(fleetops_service_areas.router)
+router.include_router(fleetops_fleets.router)
+router.include_router(fleetops_tracking_numbers.router)
+router.include_router(fleetops_tracking_statuses.router)
+router.include_router(storefront_checkouts.router)
+router.include_router(storefront_categories.router)
+router.include_router(storefront_reviews.router)
+router.include_router(storefront_food_trucks.router)
+router.include_router(storefront_stores.router)
+router.include_router(storefront_networks.router)
+router.include_router(int_storefront_stores.router)
+router.include_router(int_storefront_networks.router)
+router.include_router(int_storefront_actions.router)
+router.include_router(int_storefront_metrics.router)
+router.include_router(int_storefront_orders.router)
+router.include_router(int_storefront_store_hours.router)
+router.include_router(int_storefront_product_hours.router)
+router.include_router(int_storefront_product_variants.router)
+router.include_router(int_storefront_product_variant_options.router)
+router.include_router(int_storefront_product_addons.router)
+router.include_router(int_storefront_product_addon_categories.router)
+router.include_router(int_storefront_notification_channels.router)
+router.include_router(int_storefront_votes.router)
+router.include_router(int_storefront_catalogs.router)
+router.include_router(int_storefront_catalog_hours.router)
+router.include_router(int_storefront_customers.router)
+router.include_router(int_storefront_products.router)
+router.include_router(int_storefront_store_locations.router)
+router.include_router(int_storefront_gateways.router)
+router.include_router(int_storefront_reviews.router)
+router.include_router(int_storefront_food_trucks.router)
+router.include_router(int_storefront_addon_categories.router)
+router.include_router(int_storefront_catalog_categories.router)
+router.include_router(files.router)
+router.include_router(comments.router)
+router.include_router(settings.router)
+router.include_router(webhook_endpoints.router)
+router.include_router(webhook_request_logs.router)
+router.include_router(dashboards.router)
+router.include_router(dashboard_widgets.router)
+router.include_router(reports.router)
+router.include_router(chat_channels.router)
+router.include_router(chat_messages.router)
+router.include_router(chat_participants.router)
+router.include_router(chat_attachments.router)
+router.include_router(chat_receipts.router)
+router.include_router(int_files.router)
+router.include_router(int_comments.router)
+router.include_router(int_chat_channels.router)
+router.include_router(api_credentials.router)
+router.include_router(api_events.router)
+router.include_router(api_request_logs.router)
+router.include_router(activities.router)
+router.include_router(extensions.router)
+router.include_router(custom_fields.router)
+router.include_router(custom_field_values.router)
+router.include_router(transactions.router)
+router.include_router(schedules.router)
+router.include_router(schedule_items.router)
+router.include_router(schedule_templates.router)
+router.include_router(schedule_availability.router)
+router.include_router(schedule_constraints.router)
+router.include_router(schedule_monitor.router)
+router.include_router(groups.router)
+router.include_router(user_devices.router)
+router.include_router(lookup.router)
+router.include_router(installer.router)
+router.include_router(onboard.router)
+router.include_router(registry.router)
+
+
+
