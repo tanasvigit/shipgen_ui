@@ -1,0 +1,581 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sg-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+@layer base {
+  body {
+    @apply font-sans leading-relaxed;
+    background-color: #f9fafb;
+    color: #111827;
+  }
+
+  h1, h2, h3, h4 {
+    @apply tracking-tight text-gray-900;
+  }
+}
+
+@layer components {
+  .page-title {
+    @apply text-2xl font-semibold text-gray-900 tracking-tight;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-gray-600 mt-1;
+  }
+
+  .section-gap {
+    @apply space-y-6;
+  }
+
+  .surface-card {
+    @apply bg-white border border-gray-200 rounded-xl shadow-soft;
+  }
+
+  .table-cell-ellipsis {
+    @apply max-w-[220px] truncate whitespace-nowrap;
+  }
+}
+
+/* Custom transitions for Android-like feel */
+.android-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.android-ripple:after {
+  content: "";
+  display: block;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, #fff 10%, transparent 10.01%);
+  background-repeat: no-repeat;
+  background-position: 50%;
+  transform: scale(10, 10);
+  opacity: 0;
+  transition: transform .5s, opacity 1s;
+}
+
+.android-ripple:active:after {
+  transform: scale(0, 0);
+  opacity: .3;
+  transition: 0s;
+}
+
+/* Logistics-themed animations with smoother easing */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-60px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(60px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(50px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes scaleInFade {
+  from {
+    opacity: 0;
+    transform: scale(0.85) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(37, 99, 235, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(37, 99, 235, 0.6);
+  }
+}
+
+@keyframes truck-move {
+  0% {
+    transform: translateX(-100px);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100px);
+    opacity: 0;
+  }
+}
+
+@keyframes package-bounce {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-10px) rotate(5deg);
+  }
+  75% {
+    transform: translateY(-5px) rotate(-5deg);
+  }
+}
+
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes slideFade {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes counter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Accessibility: Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Animation utility classes with smoother easing */
+.animate-fade-in-up {
+  animation: fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-in-up {
+  animation: slideInUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-in-fade {
+  animation: scaleInFade 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-float-smooth {
+  animation: float-smooth 4s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2.5s ease-in-out infinite;
+  will-change: box-shadow;
+}
+
+.animate-truck-move {
+  animation: truck-move 8s linear infinite;
+}
+
+.animate-package-bounce {
+  animation: package-bounce 2s ease-in-out infinite;
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Stagger animation delays */
+.animation-delay-100 {
+  animation-delay: 100ms;
+}
+
+.animation-delay-200 {
+  animation-delay: 200ms;
+}
+
+.animation-delay-300 {
+  animation-delay: 300ms;
+}
+
+.animation-delay-400 {
+  animation-delay: 400ms;
+}
+
+.animation-delay-500 {
+  animation-delay: 500ms;
+}
+
+.animation-delay-600 {
+  animation-delay: 600ms;
+}
+
+.animation-delay-700 {
+  animation-delay: 700ms;
+}
+
+.animation-delay-800 {
+  animation-delay: 800ms;
+}
+
+/* Performance optimizations */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* GPU acceleration for smoother animations */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Hover effects with smoother transitions */
+.hover-lift {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-10px) scale(1.02);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(59, 130, 246, 0.1);
+}
+
+.hover-glow {
+  transition: box-shadow 0.3s ease;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 30px rgba(37, 99, 235, 0.4);
+}
+
+/* Logistics-themed background patterns */
+.logistics-pattern {
+  background-image: 
+    linear-gradient(45deg, rgba(0, 0, 0, 0.02) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(0, 0, 0, 0.02) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(0, 0, 0, 0.02) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(0, 0, 0, 0.02) 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+}
+
+/* Scroll-triggered animations with smoother easing */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(40px) scale(0.96);
+  transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), 
+              transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scroll-reveal.revealed {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.scroll-reveal-scale {
+  opacity: 0;
+  transform: scale(0.88) translateY(20px);
+  transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), 
+              transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scroll-reveal-scale.revealed {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.scroll-reveal-slide {
+  opacity: 0;
+  transform: translateX(-30px);
+  transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), 
+              transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scroll-reveal-slide.revealed {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Carousel animations */
+.carousel-slide {
+  opacity: 0;
+  transform: translateX(50px);
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  position: absolute;
+  width: 100%;
+}
+
+.carousel-slide.active {
+  opacity: 1;
+  transform: translateX(0);
+  position: relative;
+}
+
+.carousel-slide.prev {
+  transform: translateX(-50px);
+}
+
+/* Button ripple effect */
+.btn-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.btn-ripple:active::after {
+  width: 300px;
+  height: 300px;
+}
+
+/* Smooth number counter */
+.counter-animate {
+  transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Sticky navbar shadow */
+.navbar-scrolled {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.3s ease;
+}
+
+/* Consistent card styling */
+.card-base {
+  @apply bg-white rounded-xl border border-gray-200 shadow-soft;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card-base:hover {
+  @apply shadow-medium;
+  transform: translateY(-2px);
+}
+
+/* Button base styles */
+.btn-base {
+  @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
+  @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+}
+
+.btn-primary {
+  @apply btn-base bg-primary-600 text-white hover:bg-primary-700;
+  @apply focus:ring-primary-600 active:scale-95;
+}
+
+.btn-secondary {
+  @apply btn-base bg-gray-100 text-gray-700 hover:bg-gray-200;
+  @apply focus:ring-gray-500 active:scale-95;
+}
+
+/* Input base styles */
+.input-base {
+  @apply w-full px-4 py-2.5 border border-gray-200 bg-white rounded-lg text-sm text-gray-900;
+  @apply focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none;
+  @apply transition-all duration-200;
+}
+
+.select-base {
+  @apply input-base appearance-none;
+}
+
+.textarea-base {
+  @apply input-base min-h-[104px] resize-y;
+}
+
+.focus-ring {
+  box-shadow: var(--sg-focus-ring);
+}
+
+/* Smooth focus transitions */
+*:focus-visible {
+  @apply outline-none ring-2 ring-primary-600 ring-offset-2;
+}
+
+/* Loading spinner */
+.spinner {
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Table row hover */
+.table-row {
+  @apply transition-colors duration-150;
+}
+
+.table-row:hover {
+  @apply bg-gray-50;
+}
+
+.table-row-zebra:nth-child(odd) {
+  @apply bg-white;
+}
+
+.table-row-zebra:nth-child(even) {
+  @apply bg-slate-50/50;
+}
+
+/* Status badge animations */
+.status-badge {
+  @apply px-2 py-1 rounded-full text-xs font-medium transition-all duration-200;
+}
+
+.status-badge.active {
+  animation: pulseSoft 2s ease-in-out infinite;
+}
