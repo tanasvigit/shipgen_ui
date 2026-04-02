@@ -221,7 +221,7 @@ const OrdersList: React.FC = () => {
   );
 
   return (
-    <PageContainer>
+    <PageContainer flushHorizontal className="px-4 sm:px-5 lg:px-8">
       <PageHeader
         title="Orders"
         description="Manage customer orders"
@@ -279,6 +279,7 @@ const OrdersList: React.FC = () => {
           columns={columns}
           data={orders}
           rowKey={(row) => row.id}
+          fillWidth
           loading={loading}
           emptyState={{
             title: 'No orders found',

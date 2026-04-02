@@ -550,7 +550,7 @@ const App: React.FC = () => {
                 user={currentUser ? { name: currentUser.name, email: currentUser.email } : null}
                 onLogout={handleLogout}
               />
-              <main className="flex-1 min-h-0 overflow-y-auto p-4 pb-12 lg:p-8 lg:pb-12">
+              <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-4 pb-12 lg:p-8 lg:pb-12">
                 <Outlet />
               </main>
             </div>

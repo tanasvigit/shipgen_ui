@@ -279,7 +279,7 @@ const DispatchBoard: React.FC = () => {
   };
 
   return (
-    <PageContainer>
+    <PageContainer flushHorizontal className="px-4 sm:px-5 lg:px-8">
       <PageHeader
         title="Dispatcher Board"
         description="Status overview board for order execution."

@@ -38,6 +38,8 @@ interface TableProps<T> {
   pagination?: TablePaginationState;
   rowClassName?: (row: T, index: number) => string;
   onRowClick?: (row: T) => void;
+  /** On large screens keep the table at least as wide as the container (uses horizontal space). */
+  fillWidth?: boolean;
 }
 
 const cn = (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
@@ -49,7 +51,17 @@ const alignClassMap: Record<TableAlign, string> = {
 
 const getAlignmentClass = (align?: TableAlign, isActions?: boolean) => alignClassMap[align ?? (isActions ? 'right' : 'left')];
 
-function Table<T>({ columns, data, rowKey, loading = false, emptyState, pagination, rowClassName, onRowClick }: TableProps<T>) {
+function Table<T>({
+  columns,
+  data,
+  rowKey,
+  loading = false,
+  emptyState,
+  pagination,
+  rowClassName,
+  onRowClick,
+  fillWidth = false,
+}: TableProps<T>) {
   if (loading) {
     return (
       <div className="p-6">
@@ -69,7 +81,12 @@ function Table<T>({ columns, data, rowKey, loading = false, emptyState, paginati
   return (
     <div>
       <div className="-mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
-        <table className="w-full min-w-[860px] table-auto lg:min-w-0">
+        <table
+          className={cn(
+            'w-full min-w-[860px] table-auto',
+            fillWidth ? 'lg:min-w-full' : 'lg:min-w-0'
+          )}
+        >
           <thead className="border-b border-border bg-secondary-50">
             <tr>
               {columns.map((column) => (

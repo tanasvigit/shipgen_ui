@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_USE_MOCK_API?: string;
   readonly VITE_DISABLE_AUTH?: string;
   readonly VITE_DEV_AUTH?: string;
+  readonly VITE_GOOGLE_MAPS_API_KEY?: string;
 }
 
 interface ImportMeta {

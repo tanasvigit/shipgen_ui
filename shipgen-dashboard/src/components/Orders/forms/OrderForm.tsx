@@ -3,6 +3,7 @@ import { AlertCircle } from 'lucide-react';
 import { ordersService } from '../../../services/ordersService';
 import { PH, SELECT_PH } from '../../../constants/formPlaceholders';
 import { FormActions, FormContainer, FormField, FormSection, Input, Select, Textarea } from '../../common/form';
+import LocationInput, { type LocationValue } from './LocationInput';
 
 interface OrderFormProps {
   mode: 'create' | 'edit';
@@ -12,9 +13,16 @@ interface OrderFormProps {
 }
 
 const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCancel }) => {
+  const emptyLocation: LocationValue = { address: '', lat: null, lng: null };
+  const sameLocationTolerance = 0.0001;
   const [loading, setLoading] = useState(mode === 'edit');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locationErrors, setLocationErrors] = useState<{ pickup?: string; delivery?: string }>({});
+  const [locationValidity, setLocationValidity] = useState<{ pickup: boolean; delivery: boolean }>({
+    pickup: false,
+    delivery: false,
+  });
   const [formData, setFormData] = useState({
     type: '',
     internal_id: '',
@@ -24,6 +32,8 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
     customer_name: '',
     priority: '',
     pod_required: false,
+    pickup: emptyLocation as LocationValue,
+    delivery: emptyLocation as LocationValue,
   });
 
   useEffect(() => {
@@ -33,6 +43,9 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
         setLoading(true);
         setError(null);
         const order = await ordersService.getById(orderId);
+        const orderMeta = (order.meta as unknown as Record<string, unknown>) ?? {};
+        const pickup = (orderMeta.pickup as Record<string, unknown>) ?? {};
+        const delivery = (orderMeta.delivery as Record<string, unknown>) ?? {};
         setFormData({
           type: order.type ?? 'pickup',
           internal_id: order.internal_id ?? '',
@@ -42,6 +55,16 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
           customer_name: order.meta?.customer_name ?? '',
           priority: order.meta?.priority ?? 'normal',
           pod_required: !!order.options?.pod_required,
+          pickup: {
+            address: String(pickup.address ?? ''),
+            lat: pickup.lat == null ? null : Number(pickup.lat),
+            lng: pickup.lng == null ? null : Number(pickup.lng),
+          },
+          delivery: {
+            address: String(delivery.address ?? ''),
+            lat: delivery.lat == null ? null : Number(delivery.lat),
+            lng: delivery.lng == null ? null : Number(delivery.lng),
+          },
         });
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to load order');
@@ -54,6 +77,26 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nextErrors: { pickup?: string; delivery?: string } = {};
+    if (!formData.pickup.address || formData.pickup.lat == null || formData.pickup.lng == null) {
+      nextErrors.pickup = 'Pickup location must include address, latitude, and longitude.';
+    }
+    if (!formData.delivery.address || formData.delivery.lat == null || formData.delivery.lng == null) {
+      nextErrors.delivery = 'Delivery location must include address, latitude, and longitude.';
+    }
+    if (
+      formData.pickup.lat != null &&
+      formData.pickup.lng != null &&
+      formData.delivery.lat != null &&
+      formData.delivery.lng != null &&
+      Math.abs(formData.pickup.lat - formData.delivery.lat) <= sameLocationTolerance &&
+      Math.abs(formData.pickup.lng - formData.delivery.lng) <= sameLocationTolerance
+    ) {
+      nextErrors.delivery = 'Pickup and Delivery locations cannot be the same.';
+    }
+    setLocationErrors(nextErrors);
+    if (nextErrors.pickup || nextErrors.delivery) return;
+
     try {
       setSaving(true);
       setError(null);
@@ -63,7 +106,12 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
         notes: formData.notes,
         scheduled_at: formData.scheduled_at,
         status: formData.status || 'created',
-        meta: { customer_name: formData.customer_name, priority: formData.priority || 'normal' },
+        meta: {
+          customer_name: formData.customer_name,
+          priority: formData.priority || 'normal',
+          pickup: formData.pickup,
+          delivery: formData.delivery,
+        },
         options: { pod_required: formData.pod_required },
       };
       if (mode === 'edit' && orderId) await ordersService.update(orderId, payload);
@@ -83,6 +131,12 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
       </div>
     );
   }
+
+  const submitDisabled =
+    saving ||
+    !locationValidity.pickup ||
+    !locationValidity.delivery ||
+    Boolean(locationErrors.pickup || locationErrors.delivery);
 
   return (
     <FormContainer>
@@ -168,6 +222,48 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
               onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
             />
           </FormField>
+          <LocationInput
+            label="Pickup Location"
+            value={formData.pickup}
+            error={locationErrors.pickup}
+            onValidityChange={(valid) => setLocationValidity((prev) => ({ ...prev, pickup: valid }))}
+            onChange={(pickup) => {
+              setFormData((p) => ({ ...p, pickup }));
+              const nextErrors = { ...locationErrors, pickup: undefined };
+              if (
+                pickup.lat != null &&
+                pickup.lng != null &&
+                formData.delivery.lat != null &&
+                formData.delivery.lng != null &&
+                Math.abs(pickup.lat - formData.delivery.lat) <= sameLocationTolerance &&
+                Math.abs(pickup.lng - formData.delivery.lng) <= sameLocationTolerance
+              ) {
+                nextErrors.delivery = 'Pickup and Delivery locations cannot be the same.';
+              }
+              setLocationErrors(nextErrors);
+            }}
+          />
+          <LocationInput
+            label="Delivery Location"
+            value={formData.delivery}
+            error={locationErrors.delivery}
+            onValidityChange={(valid) => setLocationValidity((prev) => ({ ...prev, delivery: valid }))}
+            onChange={(delivery) => {
+              setFormData((p) => ({ ...p, delivery }));
+              const nextErrors = { ...locationErrors, delivery: undefined };
+              if (
+                formData.pickup.lat != null &&
+                formData.pickup.lng != null &&
+                delivery.lat != null &&
+                delivery.lng != null &&
+                Math.abs(formData.pickup.lat - delivery.lat) <= sameLocationTolerance &&
+                Math.abs(formData.pickup.lng - delivery.lng) <= sameLocationTolerance
+              ) {
+                nextErrors.delivery = 'Pickup and Delivery locations cannot be the same.';
+              }
+              setLocationErrors(nextErrors);
+            }}
+          />
           <div className="flex items-center gap-2 pt-1 md:col-span-2">
             <input
               id="pod_required_order_form"
@@ -184,6 +280,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
         <FormActions
           onCancel={onCancel}
           saving={saving}
+          submitDisabled={submitDisabled}
           submitLabel={mode === 'edit' ? 'Save Changes' : 'Create Order'}
         />
       </form>

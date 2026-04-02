@@ -10,9 +10,22 @@ const OrdersWrapper: React.FC = () => {
     { path: '/logistics/orders/dispatch-board', label: 'Dispatcher Board' },
   ];
 
+  /** Same horizontal inset as `PageContainer flushHorizontal` on list/board pages — keeps sub-nav aligned with cards. */
+  const contentGutter = 'px-4 sm:px-5 lg:px-8';
+
   return (
-    <div>
-      {!isEmbedded ? <SubNavigation items={subNavItems} basePath="/logistics/orders" /> : null}
+    <div
+      className={
+        isEmbedded
+          ? 'min-w-0 w-full'
+          : 'min-w-0 w-[calc(100%+2rem)] max-w-none -mx-4 lg:w-[calc(100%+4rem)] lg:-mx-8'
+      }
+    >
+      {!isEmbedded ? (
+        <div className={contentGutter}>
+          <SubNavigation items={subNavItems} basePath="/logistics/orders" />
+        </div>
+      ) : null}
       <Outlet />
     </div>
   );

@@ -15,6 +15,17 @@ export interface UiOrder {
   meta: {
     customer_name: string;
     priority: string;
+    pickup?: {
+      address: string;
+      lat: number | null;
+      lng: number | null;
+    };
+    delivery?: {
+      address: string;
+      lat: number | null;
+      lng: number | null;
+    };
+    [key: string]: unknown;
   };
   options: {
     pod_required: boolean;
@@ -83,6 +94,34 @@ const mapBackendOrderToUi = (order: BackendOrder): UiOrder => {
     meta: {
       customer_name: String(meta.customer_name ?? ''),
       priority: String(meta.priority ?? 'normal'),
+      pickup:
+        meta.pickup && typeof meta.pickup === 'object'
+          ? {
+              address: String((meta.pickup as Record<string, unknown>).address ?? ''),
+              lat:
+                (meta.pickup as Record<string, unknown>).lat == null
+                  ? null
+                  : Number((meta.pickup as Record<string, unknown>).lat),
+              lng:
+                (meta.pickup as Record<string, unknown>).lng == null
+                  ? null
+                  : Number((meta.pickup as Record<string, unknown>).lng),
+            }
+          : undefined,
+      delivery:
+        meta.delivery && typeof meta.delivery === 'object'
+          ? {
+              address: String((meta.delivery as Record<string, unknown>).address ?? ''),
+              lat:
+                (meta.delivery as Record<string, unknown>).lat == null
+                  ? null
+                  : Number((meta.delivery as Record<string, unknown>).lat),
+              lng:
+                (meta.delivery as Record<string, unknown>).lng == null
+                  ? null
+                  : Number((meta.delivery as Record<string, unknown>).lng),
+            }
+          : undefined,
     },
     options: {
       pod_required: Boolean(options.pod_required ?? order.pod_required ?? false),
