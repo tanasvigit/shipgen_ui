@@ -1,0 +1,575 @@
+================================================================================
+TECHNICAL DOCUMENTATION — ShipGen / Logistics Platform (_new_code_logistics)
+================================================================================
+End-to-end technical reference: setup, configuration, API usage, frontend
+integration, testing, deployment, and troubleshooting. Complements
+"technical architecture.txt" (system structure and design overview).
+
+Paths are relative to the repository root unless stated otherwise.
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+  1. Purpose and audience
+  2. Repository structure
+  3. Prerequisites
+  4. Local development — backend (FastAPI)
+  5. Local development — frontend (React/Vite)
+  6. Docker Compose (full stack)
+  7. Environment variables — backend
+  8. Environment variables — frontend (Vite)
+  9. Authentication and API usage
+ 10. API namespaces and documentation discovery
+ 11. Multi-tenancy and error semantics
+ 12. RBAC (roles and enforcement)
+ 13. Fleet operations — behavioral specification
+ 14. Key FleetOps HTTP endpoints (reference)
+ 15. Frontend — routing, services, mocks
+ 16. Geocoding and maps (orders)
+ 17. Database migrations (Alembic)
+ 18. Testing
+ 19. Build and release
+ 20. Observability and health
+ 21. Troubleshooting
+ 22. Related files in this repo
+
+--------------------------------------------------------------------------------
+1. PURPOSE AND AUDIENCE
+--------------------------------------------------------------------------------
+
+This document is for engineers who need to run, extend, or integrate with the
+platform: backend (Python/FastAPI), SPA (React/TypeScript), and Postgres/SQLite
+data stores. It focuses on how things work operationally and how to work safely
+in a multi-tenant, JWT-authenticated system.
+
+--------------------------------------------------------------------------------
+2. REPOSITORY STRUCTURE
+--------------------------------------------------------------------------------
+
+  fastapi-app/
+    app/
+      main.py              Application factory, CORS, OpenAPI, /health
+      api/v1/__init__.py   Aggregates all v1 routers
+      api/v1/routers/*.py  One file per domain (auth, fleetops_*, int_*, …)
+      core/                config, database, security, roles, company_scope, cache
+      models/              SQLAlchemy ORM models (tables)
+      schemas/             Pydantic request/response models
+    alembic/               Migration scripts (versions/)
+    scripts/               Seeds, endpoint smoke scripts
+    requirements.txt       Python dependencies
+    Dockerfile             Production-style API image (uvicorn :9001)
+
+  shipgen-dashboard/
+    src/
+      App.tsx              HashRouter, layouts, RoleGuard
+      components/          Feature UI (Fleet/, Logistics/, Orders/, …)
+      services/            apiClient, domain API wrappers
+      mocks/               mockApi + fixture data (optional dev)
+      config/              appMode, auth.config
+      utils/               roleAccess, helpers
+    package.json
+    Dockerfile             Static build served (e.g. nginx)
+    .env.example           VITE_* template
+
+  docker-compose.yml       postgres + api + ui wiring
+  RBAC.md                  Role descriptions (root; copy under dashboard/)
+  technical architecture.txt — structural architecture summary
+
+--------------------------------------------------------------------------------
+3. PREREQUISITES
+--------------------------------------------------------------------------------
+
+  Backend:
+    - Python 3.11+ recommended (Dockerfile uses 3.11)
+    - pip, virtual environment (recommended)
+
+  Frontend:
+    - Node.js 18+
+    - npm
+
+  Database:
+    - Default local dev: SQLite file (see Settings.DB_DATABASE)
+    - Docker / production-style: PostgreSQL 15+ (psycopg2 driver)
+
+  Optional:
+    - Redis (if features under app.core.cache are enabled for your deployment)
+    - Google Maps API key (Places/geocoding in Order location UI)
+
+--------------------------------------------------------------------------------
+4. LOCAL DEVELOPMENT — BACKEND (FASTAPI)
+--------------------------------------------------------------------------------
+
+ 1) Create and activate a virtual environment in fastapi-app/.
+
+ 2) Install dependencies:
+      pip install -r requirements.txt
+
+ 3) Configure environment:
+      Copy or create fastapi-app/.env with at least:
+        DB_CONNECTION=sqlite
+        DB_DATABASE=shipgen.db
+        JWT_SECRET_KEY=<strong secret in real deployments>
+        BACKEND_CORS_ORIGINS entries for your SPA origin (5173 in Vite dev)
+
+    For PostgreSQL locally (example):
+        DB_CONNECTION=postgresql+psycopg2
+        DB_HOST=localhost
+        DB_PORT=5432
+        DB_DATABASE=shipgen
+        DB_USERNAME=...
+        DB_PASSWORD=...
+
+ 4) Apply schema migrations (from fastapi-app/, with Alembic configured):
+      alembic upgrade head
+    (Exact invocation depends on your working directory and PYTHONPATH; many
+    teams run from fastapi-app with PYTHONPATH including `app`.)
+
+ 5) Run the API:
+      uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    Note: docker-compose uses port 9001 inside the API container; locally you
+    may use 8000. Align VITE_API_BASE_URL with whatever port you expose.
+
+ 6) Interactive docs:
+      http://<host>:<port>/docs   (Swagger UI)
+      http://<host>:<port>/redoc  (ReDoc)
+
+--------------------------------------------------------------------------------
+5. LOCAL DEVELOPMENT — FRONTEND (REACT/VITE)
+--------------------------------------------------------------------------------
+
+ 1) cd shipgen-dashboard
+
+ 2) npm install
+
+ 3) Copy .env.example to .env and set:
+      VITE_API_BASE_URL=http://127.0.0.1:8000
+    (Or the port your API actually uses. No trailing slash.)
+
+ 4) Start dev server:
+      npm run dev
+    Default Vite URL is often http://localhost:5173 — the app uses HashRouter,
+    so routes look like http://localhost:5173/#/dashboard.
+
+ 5) Production bundle check:
+      npm run build
+      npm run preview   (optional local static serve)
+
+ 6) Lint:
+      npm run lint
+
+ 7) E2E (Playwright):
+      npm run test:e2e
+    May require backend for real login flows.
+
+--------------------------------------------------------------------------------
+6. DOCKER COMPOSE (FULL STACK)
+--------------------------------------------------------------------------------
+
+File: docker-compose.yml
+
+  Service: postgres
+    - Image: postgres:15-alpine
+    - Port: 5432
+    - Database: shipgen
+
+  Service: api
+    - Build: fastapi-app/Dockerfile
+    - Port: 9001:9001
+    - Env: DB_CONNECTION=postgresql+psycopg2, DB_HOST=postgres, etc.
+    - Health: GET http://localhost:9001/health
+
+  Service: ui
+    - Build: shipgen-dashboard/Dockerfile with build-arg VITE_API_BASE_URL
+    - Depends on api healthy
+    - Host port mapping may expose 5173 → container 80 (per compose file)
+
+Important: When the UI is built with a fixed VITE_API_BASE_URL, the browser
+calls that URL from the **user’s machine**. If you set VITE_API_BASE_URL to
+http://localhost:9001, the browser must reach the API on localhost:9001.
+If the UI runs only inside Docker without host networking, you may need a
+hostname reachable from the browser (e.g. host.docker.internal or published
+port) — adjust per your OS and network layout.
+
+--------------------------------------------------------------------------------
+7. ENVIRONMENT VARIABLES — BACKEND
+--------------------------------------------------------------------------------
+
+Defined in fastapi-app/app/core/config.py (pydantic-settings; reads .env).
+
+  APP_NAME                Human-readable name
+  ENV                     e.g. development
+  DEBUG                   bool
+
+  DB_CONNECTION           sqlite | postgresql+psycopg2 | … (SQLAlchemy scheme)
+  DB_HOST, DB_PORT        DB host/port (non-sqlite)
+  DB_DATABASE             DB name or sqlite filename
+  DB_USERNAME, DB_PASSWORD
+
+  JWT_SECRET_KEY          HS256 signing secret (must be strong in production)
+  JWT_ALGORITHM           default HS256
+  ACCESS_TOKEN_EXPIRE_MINUTES
+
+  BACKEND_CORS_ORIGINS    List of allowed browser origins (AnyHttpUrl)
+  PORT                    Used in docs/ops; uvicorn bind port is chosen at CLI
+
+Behavior notes:
+  - SQLite URL is built as sqlite:///./{DB_DATABASE} with check_same_thread
+    disabled for compatibility with FastAPI request threads.
+  - main.py also injects common dev origins (4200, 4201, 5173) before merging
+    BACKEND_CORS_ORIGINS.
+
+--------------------------------------------------------------------------------
+8. ENVIRONMENT VARIABLES — FRONTEND (VITE)
+--------------------------------------------------------------------------------
+
+See shipgen-dashboard/.env.example.
+
+  VITE_API_BASE_URL
+    Primary API base (no trailing slash). Used by src/services/api.ts.
+
+  VITE_API_BASE
+    Legacy alias if VITE_API_BASE_URL is unset.
+
+  VITE_USE_MOCK_API=true
+    When true, most HTTP calls are served by src/mocks/mockApi.ts instead of
+    the network. Exceptions typically include:
+      - /int/v1/auth/*  (real login)
+      - /fleetops/v1/orders* (forced real in apiClient for consistency)
+    Use only for frontend-only demos.
+
+  VITE_DISABLE_AUTH=true
+    Skips auth/role gates for local UI work. Never use on public deployments.
+
+  VITE_GOOGLE_MAPS_API_KEY
+    Optional: enables Google Places + geocoding in order location inputs.
+
+Implementation: src/config/appMode.ts maps VITE_* flags to APP_MODE.
+
+--------------------------------------------------------------------------------
+9. AUTHENTICATION AND API USAGE
+--------------------------------------------------------------------------------
+
+  Protocol: HTTP Authorization header with Bearer JWT:
+    Authorization: Bearer <access_token>
+
+  Obtain token:
+    POST /int/v1/auth/login
+    Body shape (see app/schemas/auth.py): identity or email + password (and
+    optional paths for token/bootstrap flows).
+
+  Typical SPA behavior (src/services/apiClient.ts):
+    - Reads token from localStorage
+    - Attaches Authorization on each request
+    - On 401: clears token-related keys and redirects to /#/login
+
+  Current user profile:
+    Routers may depend on _get_current_user (auth.py), which decodes JWT "sub"
+    as User.uuid and loads the User row.
+
+--------------------------------------------------------------------------------
+10. API NAMESPACES AND DOCUMENTATION DISCOVERY
+--------------------------------------------------------------------------------
+
+The FastAPI app mounts a large v1 router bundle with **per-router prefixes**.
+
+  /int/v1/auth/*           Public/protected auth, bootstrap, organizations
+  /int/v1/users, /int/v1/companies, …   Internal admin APIs
+  /int/v1/me               Session/current user patterns (see me.py)
+  /fleetops/v1/orders      Orders CRUD (fleetops_orders.py)
+  /fleetops/v1/orders/*    Order flow (assign/status — fleetops_order_flow.py
+                           shares prefix; see OpenAPI for path clashes/order)
+  /fleetops/v1/drivers     Drivers
+  /fleetops/v1/vehicles    Vehicles
+  /fleetops/v1/fleet/dashboard  Aggregated fleet dashboard payload
+  /int/v1/customers        Internal storefront customers (dashboard logistics)
+  /storefront/v1/*         Storefront-facing resources
+  /v1/*                    Misc public/shared resources
+
+Authoritative method list: GET /openapi.json or Swagger UI at /docs.
+
+--------------------------------------------------------------------------------
+11. MULTI-TENANCY AND ERROR SEMANTICS
+--------------------------------------------------------------------------------
+
+  Tenant key: company_uuid (string UUID on User and most fleet rows).
+
+  Pattern used in hardened fleet endpoints:
+    1) Authenticate → User
+    2) require_company_uuid(user) → company_uuid or HTTP 400 if absent
+    3) Query with .filter(Model.company_uuid == company_uuid, …)
+    4) Return HTTP 404 for missing resources or cross-tenant IDs (avoid
+       leaking existence of other companies’ records)
+
+Implications for clients:
+  - Users without company_uuid cannot use company-scoped fleet mutations.
+  - Lists never return other tenants’ data when correctly scoped.
+
+--------------------------------------------------------------------------------
+12. RBAC (ROLES AND ENFORCEMENT)
+--------------------------------------------------------------------------------
+
+  Canonical role strings (app/core/roles.py):
+    ADMIN, OPERATIONS_MANAGER, DISPATCHER, DRIVER, VIEWER
+
+  effective_user_role(user):
+    - Normalizes missing/unknown role to DISPATCHER server-side for consistency
+      in permission checks.
+
+  require_roles(*allowed):
+    - FastAPI dependency: HTTP 403 if role not in allowed set.
+
+  STAFF_ORDER_MUTATORS:
+    - Frozen set used where order mutation must be restricted to staff roles.
+
+Frontend mirror:
+  - src/types.ts UserRole
+  - src/utils/roleAccess.ts — per-section access levels
+  - RoleGuard — wraps routes in App.tsx
+
+Human-readable matrix: RBAC.md in repo root.
+
+--------------------------------------------------------------------------------
+13. FLEET OPERATIONS — BEHAVIORAL SPECIFICATION
+--------------------------------------------------------------------------------
+
+13.1 Driver ↔ vehicle link
+  - Persistent association: Driver.vehicle_uuid → Vehicle.uuid
+  - Vehicle assignment API may set this link explicitly.
+
+13.2 Order assignment
+  - Order.driver_assigned_uuid / Order.vehicle_assigned_uuid represent live
+    dispatch. They can differ from Driver.vehicle_uuid (e.g. temporary pairing).
+
+13.3 "Unassigned" filters and KPIs
+  - Driver list query `unassigned=true`: drivers with no vehicle_uuid (null or
+    empty) AND not appearing as driver_assigned_uuid on any **active** order
+    for the company (status not in terminal set; not soft-deleted).
+  - Vehicle list `unassigned=true`: vehicles not linked by any driver’s
+    vehicle_uuid AND not vehicle_assigned_uuid on active orders (same notion).
+  - Fleet dashboard KPIs use analogous counts (see fleetops_fleet_dashboard.py).
+
+  Terminal order statuses (dashboard): completed, cancelled, failed.
+
+13.4 Telemetry
+  - Drivers: latitude, longitude, heading, speed, altitude stored as strings on
+    Driver; API schemas may coerce to floats in JSON responses.
+  - Vehicles: track endpoints may write coordinates into vehicle.meta JSON;
+    VehicleOut schema may surface latitude/longitude at top level for clients.
+
+13.5 Pagination (fleet lists)
+  - Response envelope: { "data": [...], "total": N, "limit": L, "offset": O }
+  - Clients should use `total` for total row count, not len(data) alone.
+
+13.6 Fleet dashboard (single call)
+  - GET /fleetops/v1/fleet/dashboard
+  - Returns KPIs plus embedded driver and vehicle rows for the company.
+  - Assignment columns: prefer driver.vehicle_uuid; if absent, derive display
+    pairing from active order assignments via in-memory maps (avoids empty UI
+    when only order has assignment).
+
+--------------------------------------------------------------------------------
+14. KEY FLEETOPS HTTP ENDPOINTS (REFERENCE)
+--------------------------------------------------------------------------------
+
+Base paths below are relative to server root (no /api prefix unless your proxy
+adds one).
+
+Drivers (fleetops_drivers.py — prefix /fleetops/v1/drivers):
+  GET    /                  List (query: search, status, online, unassigned,
+                              limit, offset, …) → DriversListResponse
+  GET    /{driver_id}       Detail
+  POST   /                  Create (company from token; payload company ignored)
+  PATCH  /{driver_id}       Update
+  DELETE /{driver_id}       Soft delete (per implementation)
+  POST   /track              Global telemetry update
+  POST   /{driver_id}/track Per-driver telemetry
+  POST   /{driver_id}/toggle-online
+  POST   /register-device, POST /{driver_id}/register-device
+  POST   /switch-organization, POST /{driver_id}/switch-organization
+        (hardened paths require target company to match user’s company)
+
+Vehicles (fleetops_vehicles.py — prefix /fleetops/v1/vehicles):
+  GET    /                  List (+ unassigned, status, pagination)
+  GET    /{vehicle_id}     Detail
+  POST   /                  Create
+  PATCH  /{vehicle_id}      Update
+  DELETE /{vehicle_id}      Delete
+  POST   /{vehicle_id}/track               Telemetry → meta
+  POST   /assign-driver                    Link driver to vehicle (sets
+                                         driver.vehicle_uuid)
+
+Orders:
+  fleetops_orders.py — CRUD/list orders under /fleetops/v1/orders
+  fleetops_order_flow.py — workflow (assign, status transitions) under the same
+  prefix; consult OpenAPI for exact paths and methods to avoid ambiguity.
+
+Fleet dashboard:
+  GET /fleetops/v1/fleet/dashboard → FleetDashboardResponse (schemas in
+      app/schemas/fleet_dashboard.py)
+
+Customers (internal):
+  /int/v1/customers — used by logistics customer screens (see router file).
+
+This section is not exhaustive; the OpenAPI document lists every route.
+
+--------------------------------------------------------------------------------
+15. FRONTEND — ROUTING, SERVICES, MOCKS
+--------------------------------------------------------------------------------
+
+15.1 Entry and routing
+  - src/main.tsx mounts the React tree
+  - src/App.tsx: HashRouter, nested routes, RoleGuard, ScrollToTopOnRouteChange
+
+15.2 Notable routes (hash paths, without # prefix in Route defs)
+  - /login
+  - /dashboard
+  - /logistics/orders, /logistics/customers, dispatch-board, :id
+  - /fleet/dashboard (default /fleet)
+  - /fleet/drivers, /fleet/drivers/:id
+  - /fleet/vehicles, /fleet/vehicles/:id
+  - /warehouse/*, /billing/*, /analytics/* — many admin modules
+
+15.3 HTTP layer
+  - services/apiClient.ts — single axios instance, interceptors, mock routing
+  - services/baseService.ts — shared parsing helpers
+  - Per resource: driversService.ts, vehiclesService.ts, ordersService.ts,
+    fleetDashboardService.ts, customersService.ts, auth.ts, …
+
+15.4 URL-driven filters
+  - DriversList/VehiclesList read query string (e.g. status, online,
+    unassigned) for deep links from dashboard KPI cards.
+
+15.5 Tables and modals
+  - ResponsiveTable supports onRowClick for row-as-record interactions
+  - Action buttons use stopPropagation() where both row click and button actions
+    exist (avoid duplicate handlers).
+
+15.6 Mocks
+  - src/mocks/mockApi.ts implements key GET/POST shapes for offline development
+  - src/mocks/data/* hosts sample entities; keep in sync when changing API
+    contracts for mock-first workflows
+
+--------------------------------------------------------------------------------
+16. GEOCODING AND MAPS (ORDERS)
+--------------------------------------------------------------------------------
+
+  - LocationInput / LocationPickerMap: address search, map pick, manual entry
+  - Optional Google Places: VITE_GOOGLE_MAPS_API_KEY
+  - OpenStreetMap Nominatim may be used as fallback (respect OSM usage policy)
+
+  Implementation detail: LocationInput uses ref-guarded validity callbacks to
+  avoid React update depth loops when parent state would otherwise ping-pong.
+
+--------------------------------------------------------------------------------
+17. DATABASE MIGRATIONS (ALEMBIC)
+--------------------------------------------------------------------------------
+
+  Location: fastapi-app/alembic/
+
+  Typical commands (from appropriate working directory with app on path):
+    alembic revision --autogenerate -m "description"
+    alembic upgrade head
+    alembic downgrade -1
+
+  Migrations present include core IAM, fleetops tables, storefront expansion,
+  utilities, and RBAC user role column (0017_user_role_rbac.py).
+
+  Always backup production databases before upgrade. Test migrations against a
+  copy of production-like data when possible.
+
+--------------------------------------------------------------------------------
+18. TESTING
+--------------------------------------------------------------------------------
+
+Backend (pytest):
+  Location: fastapi-app/app/tests/
+
+  Run all:
+    pytest
+
+  Focused:
+    pytest app/tests/test_fleetops_drivers.py
+    pytest app/tests/test_fleetops_fleet_dashboard.py
+
+  Markers (see app/tests/README.md):
+    -m auth | iam | fleetops | twofa | notifications | unit | integration
+
+  Coverage:
+    pytest --cov=app --cov-report=html
+
+  Test DB: in-memory SQLite per fastapi-app/app/tests/conftest.py patterns.
+
+Frontend:
+  npm run lint
+  npm run build
+  npm run test:e2e  (Playwright — broader, environment-dependent)
+
+--------------------------------------------------------------------------------
+19. BUILD AND RELEASE
+--------------------------------------------------------------------------------
+
+Backend:
+  - Pin dependencies in requirements.txt
+  - Run tests and migrations in CI
+  - Container: fastapi-app/Dockerfile → uvicorn on 0.0.0.0:9001
+
+Frontend:
+  - Set VITE_API_BASE_URL (and never enable VITE_USE_MOCK_API / VITE_DISABLE_AUTH
+    on public production sites unless intentional)
+  - npm run build → dist/
+  - Deploy dist/ as static files; HashRouter avoids server rewrite requirement
+
+--------------------------------------------------------------------------------
+20. OBSERVABILITY AND HEALTH
+--------------------------------------------------------------------------------
+
+  GET /health
+    Returns JSON status for load balancers (see docker-compose healthcheck).
+
+  Application logging: use standard Python logging as extended in your
+  deployment; this repo’s base app does not mandate a specific log aggregator.
+
+--------------------------------------------------------------------------------
+21. TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+21.1 CORS errors from browser
+  Symptom: "No 'Access-Control-Allow-Origin' header" when SPA calls API.
+  Fix: Ensure BACKEND_CORS_ORIGINS includes exact browser origin (scheme+host+port),
+  e.g. http://localhost:5173. main.py merges defaults but misconfigured env or
+  reverse proxies stripping headers can still break CORS.
+
+21.2 401 after login
+  Symptom: Immediate redirect to login on API calls.
+  Check: token in localStorage, server clock skew, JWT_SECRET_KEY mismatch
+  between token issuance and validation environments.
+
+21.3 403 on fleet actions
+  Role may be VIEWER or DRIVER where mutation requires staff role; verify
+  User.role in DB and effective_user_role behavior.
+
+21.4 400 "not associated with a company"
+  User.company_uuid empty — assign company in data model or use a provisioned
+  test user from seeds/tests.
+
+21.5 Mock vs real data confusion
+  If VITE_USE_MOCK_API=true, UI may show mock payloads while auth still hits
+  real /int/v1/auth. Turn mock off to verify integration against a live API.
+
+21.6 Docker UI cannot reach API
+  Browser calls VITE_API_BASE_URL from the host. Use a URL reachable from the
+  host, not only from inside the container network.
+
+--------------------------------------------------------------------------------
+22. RELATED FILES IN THIS REPO
+--------------------------------------------------------------------------------
+
+  technical architecture.txt     High-level architecture summary
+  RBAC.md                         Role documentation
+  FUNCTIONAL_DOCUMENTATION.md     Product/functional notes (if maintained)
+  shipgen-dashboard/README.md     Frontend setup and QA checklist
+  fastapi-app/app/tests/README.md Pytest layout and markers
+
+--------------------------------------------------------------------------------
+END OF TECHNICAL DOCUMENTATION
+--------------------------------------------------------------------------------

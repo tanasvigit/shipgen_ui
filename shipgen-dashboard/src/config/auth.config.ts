@@ -16,7 +16,7 @@ export const SUPERADMIN_USER: User = {
   id: 'sa-1',
   name: 'Super Administrator',
   email: SUPERADMIN_CREDENTIALS.email,
-  role: UserRole.SUPER_ADMIN,
+  role: UserRole.ADMIN,
   company_id: 'system',
 };
 

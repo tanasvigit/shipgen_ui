@@ -6,6 +6,7 @@ const FleetWrapper: React.FC = () => {
   const location = useLocation();
   const isEmbedded = new URLSearchParams(location.search).get('embed') === '1';
   const menuItems = [
+    { path: '/fleet/dashboard', label: 'Dashboard' },
     { path: '/fleet/vehicles', label: 'Vehicles' },
     { path: '/fleet/drivers', label: 'Drivers' },
     { path: '/fleet/fleets', label: 'Fleets' },
@@ -32,6 +33,7 @@ const FleetWrapper: React.FC = () => {
 
   const currentItem = getCurrentItem();
   const listLabelByPath: Record<string, string> = {
+    '/fleet/dashboard': 'Fleet Dashboard',
     '/fleet/vehicles': 'Vehicles List',
     '/fleet/drivers': 'Drivers List',
     '/fleet/vendors': 'Vendors List',

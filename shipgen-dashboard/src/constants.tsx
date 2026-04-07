@@ -14,8 +14,6 @@ import {
   CheckCircle2,
   AlertCircle,
   ShieldCheck,
-  HardDrive,
-  Navigation
 } from 'lucide-react';
 
 export const COLORS = {
@@ -45,10 +43,8 @@ export const NAVIGATION_ITEMS = [
   { id: 'logistics', label: 'Orders', icon: <Package size={20} /> },
   { id: 'warehouse', label: 'Warehouse Ops', icon: <Warehouse size={20} /> },
   { id: 'fleet', label: 'Fleet & Drivers', icon: <Truck size={20} /> },
-  { id: 'live-operations', label: 'Live Operations', icon: <Navigation size={20} /> },
   { id: 'billing', label: 'Billing', icon: <FileText size={20} /> },
   { id: 'analytics', label: 'Reports', icon: <BarChart3 size={20} /> },
-  { id: 'master-data', label: 'Master Data', icon: <HardDrive size={20} /> },
 ];
 
 /**

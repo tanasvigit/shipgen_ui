@@ -87,16 +87,25 @@ const LocationInput: React.FC<LocationInputProps> = ({ label, value, error, onCh
   const [manualState, setManualState] = useState('');
   const [manualPincode, setManualPincode] = useState('');
   const searchToken = useRef(0);
+  const onValidityChangeRef = useRef(onValidityChange);
+  onValidityChangeRef.current = onValidityChange;
+  const lastValidityReported = useRef<boolean | undefined>(undefined);
 
   useEffect(() => {
     if (value.address && !query) setQuery(value.address);
   }, [value.address, query]);
 
+  // Derive validity from `value` only. Do not list `onValidityChange` in deps — parent often passes an
+  // inline function (new ref every render), which would re-run this effect every time and loop:
+  // effect → setState in parent → re-render → new callback → effect → …
   useEffect(() => {
-    if (!onValidityChange) return;
+    const cb = onValidityChangeRef.current;
+    if (!cb) return;
     const valid = Boolean(value.address && value.lat != null && value.lng != null);
-    onValidityChange(valid);
-  }, [onValidityChange, value.address, value.lat, value.lng]);
+    if (lastValidityReported.current === valid) return;
+    lastValidityReported.current = valid;
+    cb(valid);
+  }, [value.address, value.lat, value.lng]);
 
   useEffect(() => {
     let mounted = true;

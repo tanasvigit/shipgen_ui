@@ -1,6 +1,6 @@
 import { apiClient } from './apiClient';
-import { normalizeList, normalizeSingle } from './baseService';
-import type { ListResponse, PaginatedResponse } from '../types/api';
+import { normalizeSingle, parseFleetPaginatedResponse } from './baseService';
+import type { PaginatedResponse } from '../types/api';
 
 export interface UiDriver {
   id: string;
@@ -11,8 +11,8 @@ export interface UiDriver {
   drivers_license_number: string;
   status: string;
   online: number;
-  latitude?: string | null;
-  longitude?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   heading?: string | null;
   speed?: string | null;
   altitude?: string | null;
@@ -31,8 +31,8 @@ interface BackendDriver {
   drivers_license_number?: string | null;
   status?: string | null;
   online?: number | null;
-  latitude?: string | null;
-  longitude?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   heading?: string | null;
   speed?: string | null;
   altitude?: string | null;
@@ -55,8 +55,8 @@ const mapBackendDriverToUi = (driver: BackendDriver): UiDriver => ({
   drivers_license_number: String(driver.drivers_license_number ?? ''),
   status: String(driver.status ?? 'active'),
   online: Number(driver.online ?? 0),
-  latitude: toStr(driver.latitude),
-  longitude: toStr(driver.longitude),
+  latitude: driver.latitude != null && !Number.isNaN(Number(driver.latitude)) ? Number(driver.latitude) : null,
+  longitude: driver.longitude != null && !Number.isNaN(Number(driver.longitude)) ? Number(driver.longitude) : null,
   heading: toStr(driver.heading),
   speed: toStr(driver.speed),
   altitude: toStr(driver.altitude),
@@ -65,19 +65,39 @@ const mapBackendDriverToUi = (driver: BackendDriver): UiDriver => ({
 });
 
 class DriversService {
-  async list(params: { page: number; pageSize: number; status?: string }): Promise<DriverListResult> {
+  async list(params: {
+    page: number;
+    pageSize: number;
+    status?: string;
+    online?: number;
+    unassigned?: boolean;
+  }): Promise<DriverListResult> {
     const query = new URLSearchParams({
       limit: String(params.pageSize),
       offset: String((params.page - 1) * params.pageSize),
     });
     if (params.status) query.set('status', params.status);
-    const payload = await apiClient.get<ListResponse<BackendDriver>>(`${DRIVERS_BASE_PATH}/?${query.toString()}`);
-    const rows = normalizeList<BackendDriver>(payload, ['drivers']);
+    if (params.online != null) query.set('online', String(params.online));
+    if (params.unassigned) query.set('unassigned', 'true');
+    const payload = await apiClient.get<unknown>(`${DRIVERS_BASE_PATH}/?${query.toString()}`);
+    const { rows, total } = parseFleetPaginatedResponse<BackendDriver>(payload, ['drivers']);
     const mapped = rows.map(mapBackendDriverToUi);
     return {
       data: mapped,
-      pagination: { total: mapped.length, page: params.page, pageSize: params.pageSize },
+      pagination: { total, page: params.page, pageSize: params.pageSize },
     };
+  }
+
+  /** Drivers with driver.vehicle_uuid === this vehicle (company-scoped on the server). */
+  async listForVehicle(vehicleUuid: string, pageSize = 20): Promise<UiDriver[]> {
+    const query = new URLSearchParams({
+      vehicle_uuid: vehicleUuid,
+      limit: String(pageSize),
+      offset: '0',
+    });
+    const payload = await apiClient.get<unknown>(`${DRIVERS_BASE_PATH}/?${query.toString()}`);
+    const { rows } = parseFleetPaginatedResponse<BackendDriver>(payload, ['drivers']);
+    return rows.map(mapBackendDriverToUi);
   }
 
   async getById(id: string): Promise<UiDriver> {
@@ -86,14 +106,14 @@ class DriversService {
   }
 
   async create(input: {
-    company_uuid: string | null;
-    user_uuid: string | null;
+    company_uuid?: string | null;
+    user_uuid?: string | null;
     drivers_license_number: string;
     status: string;
   }): Promise<UiDriver> {
     const payload = await apiClient.post<unknown>(`${DRIVERS_BASE_PATH}/`, {
-      company_uuid: input.company_uuid,
-      user_uuid: input.user_uuid,
+      company_uuid: input.company_uuid ?? null,
+      user_uuid: input.user_uuid ?? null,
       drivers_license_number: input.drivers_license_number,
       status: input.status,
     });
@@ -102,7 +122,7 @@ class DriversService {
 
   async update(
     id: string,
-    input: { drivers_license_number?: string; status?: string },
+    input: { drivers_license_number?: string; status?: string; online?: number },
   ): Promise<UiDriver> {
     const payload = await apiClient.patch<unknown>(`${DRIVERS_BASE_PATH}/${id}`, input);
     return mapBackendDriverToUi((normalizeSingle<BackendDriver>(payload, ['driver']) ?? {}) as BackendDriver);

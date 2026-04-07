@@ -82,6 +82,20 @@ export const mockApi = {
     if (path === '/vehicles') {
       let rows = [...mockVehicles];
       if (params?.status) rows = rows.filter((v) => v.status === params.status);
+      if (params?.unassigned === 'true' || params?.unassigned === true) {
+        const activeVehicleIds = new Set(
+          mockOrders
+            .filter((o) => !['completed', 'cancelled', 'failed'].includes(String(o.status ?? '').toLowerCase()))
+            .map((o) => String((o as { vehicle_assigned_uuid?: string | null }).vehicle_assigned_uuid ?? ''))
+            .filter(Boolean)
+        );
+        const linkedVehicleIds = new Set(
+          mockDrivers
+            .map((d: { vehicle_uuid?: string | null }) => String(d.vehicle_uuid ?? ''))
+            .filter(Boolean)
+        );
+        rows = rows.filter((v) => !linkedVehicleIds.has(String(v.id)) && !activeVehicleIds.has(String(v.id)));
+      }
       return delay(paginate(rows, params));
     }
     if (path.startsWith('/vehicles/')) {
@@ -89,16 +103,98 @@ export const mockApi = {
       return delay(mockVehicles.find((v) => v.id === id) ?? {});
     }
 
-    if (path === '/drivers') return delay(paginate(mockDrivers, params));
+    if (path === '/drivers') {
+      let rows = [...mockDrivers];
+      if (params?.status) rows = rows.filter((d: { status?: string }) => d.status === params.status);
+      if (String(params?.online ?? '') === '1') rows = rows.filter((d: { online?: number }) => d.online === 1);
+      if (params?.unassigned === 'true' || params?.unassigned === true) {
+        const activeDriverIds = new Set(
+          mockOrders
+            .filter((o) => !['completed', 'cancelled', 'failed'].includes(String(o.status ?? '').toLowerCase()))
+            .map((o) => String((o as { driver_assigned_uuid?: string | null }).driver_assigned_uuid ?? ''))
+            .filter(Boolean)
+        );
+        rows = rows.filter(
+          (d: { id?: string; vehicle_uuid?: string | null }) =>
+            !d.vehicle_uuid && !activeDriverIds.has(String(d.id ?? ''))
+        );
+      }
+      if (params?.vehicle_uuid) {
+        rows = rows.filter((d: { vehicle_uuid?: string }) => d.vehicle_uuid === params.vehicle_uuid);
+      }
+      return delay(paginate(rows, params));
+    }
     if (path.startsWith('/drivers/')) {
       const id = path.split('/')[2];
       return delay(mockDrivers.find((d) => d.id === id) ?? {});
     }
 
+    if (path === '/fleet/dashboard') {
+      const driversUnassigned = mockDrivers.filter((d: { vehicle_uuid?: string }) => !d.vehicle_uuid).length;
+      const driverByVehicle: Record<string, (typeof mockDrivers)[0]> = {};
+      mockDrivers.forEach((d: (typeof mockDrivers)[0] & { vehicle_uuid?: string }) => {
+        if (d.vehicle_uuid && !driverByVehicle[d.vehicle_uuid]) driverByVehicle[d.vehicle_uuid] = d;
+      });
+      const vehiclesUnassigned = mockVehicles.filter((v) => !driverByVehicle[v.id]).length;
+      const kpis = {
+        drivers_total: mockDrivers.length,
+        drivers_active: mockDrivers.filter((d: { status?: string }) => d.status === 'active').length,
+        drivers_online: mockDrivers.filter((d: { online?: number }) => d.online === 1).length,
+        drivers_unassigned: driversUnassigned,
+        vehicles_total: mockVehicles.length,
+        vehicles_active: mockVehicles.filter((v) => v.status === 'active').length,
+        vehicles_unassigned: vehiclesUnassigned,
+        vehicles_in_use: 0,
+      };
+      const drivers = mockDrivers.map((d: (typeof mockDrivers)[0] & { vehicle_uuid?: string }) => {
+        const veh = mockVehicles.find((v) => v.id === d.vehicle_uuid);
+        const lat = d.latitude != null ? Number(d.latitude) : null;
+        const lng = d.longitude != null ? Number(d.longitude) : null;
+        return {
+          driver_uuid: d.id,
+          public_id: d.id,
+          status: d.status ?? null,
+          online: d.online ?? 0,
+          vehicle_uuid: d.vehicle_uuid ?? null,
+          vehicle_plate: veh?.plate_number ?? null,
+          latitude: Number.isFinite(lat) ? lat : null,
+          longitude: Number.isFinite(lng) ? lng : null,
+        };
+      });
+      const vehicles = mockVehicles.map((v) => {
+        const dr = driverByVehicle[v.id];
+        const m = v.meta as Record<string, unknown> | undefined;
+        const lat = m?.latitude != null ? Number(m.latitude) : null;
+        const lng = m?.longitude != null ? Number(m.longitude) : null;
+        return {
+          vehicle_uuid: v.id,
+          plate_number: v.plate_number ?? null,
+          status: v.status ?? null,
+          assigned_driver_uuid: dr?.id ?? null,
+          assigned_driver_name: (dr as { drivers_license_number?: string } | undefined)?.drivers_license_number ?? null,
+          latitude: Number.isFinite(lat) ? lat : null,
+          longitude: Number.isFinite(lng) ? lng : null,
+        };
+      });
+      return delay({ kpis, drivers, vehicles });
+    }
+
     if (path === '/contacts') {
       let rows = [...mockContacts];
-      if (params?.type) rows = rows.filter((c) => c.type === params.type);
-      return delay(paginate(rows, params));
+      const kind = params?.kind ?? params?.type;
+      if (kind) rows = rows.filter((c) => c.type === kind);
+      const q = params?.search != null ? String(params.search).trim().toLowerCase() : '';
+      if (q) {
+        rows = rows.filter((c) => {
+          const name = (c.name ?? '').toLowerCase();
+          const phone = (c.phone ?? '').toLowerCase();
+          const email = (c.email ?? '').toLowerCase();
+          return name.includes(q) || phone.includes(q) || email.includes(q);
+        });
+      }
+      const limit = Number(params?.limit) || 50;
+      const offset = Number(params?.offset) || 0;
+      return delay({ contacts: rows.slice(offset, offset + limit) });
     }
     if (path.startsWith('/contacts/')) return delay(routeContact(path) ?? {});
 

@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { ordersService } from '../../../services/ordersService';
 import { PH, SELECT_PH } from '../../../constants/formPlaceholders';
 import { FormActions, FormContainer, FormField, FormSection, Input, Select, Textarea } from '../../common/form';
 import LocationInput, { type LocationValue } from './LocationInput';
+import CustomerSelector from '../../Logistics/CustomerSelector';
 
 interface OrderFormProps {
   mode: 'create' | 'edit';
@@ -23,13 +24,15 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
     pickup: false,
     delivery: false,
   });
+  const [customerUuid, setCustomerUuid] = useState('');
+  const [customerLabel, setCustomerLabel] = useState('');
+  const [customerError, setCustomerError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     type: '',
     internal_id: '',
     notes: '',
     scheduled_at: '',
     status: '',
-    customer_name: '',
     priority: '',
     pod_required: false,
     pickup: emptyLocation as LocationValue,
@@ -46,13 +49,17 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
         const orderMeta = (order.meta as unknown as Record<string, unknown>) ?? {};
         const pickup = (orderMeta.pickup as Record<string, unknown>) ?? {};
         const delivery = (orderMeta.delivery as Record<string, unknown>) ?? {};
+        setCustomerUuid(order.customer_uuid ?? '');
+        setCustomerLabel(
+          String(order.customer_display_name ?? '').trim() || String(order.meta?.customer_name ?? '').trim(),
+        );
+        setCustomerError(null);
         setFormData({
           type: order.type ?? 'pickup',
           internal_id: order.internal_id ?? '',
           notes: order.notes ?? '',
           scheduled_at: order.scheduled_at ? order.scheduled_at.slice(0, 16) : '',
           status: order.status ?? 'created',
-          customer_name: order.meta?.customer_name ?? '',
           priority: order.meta?.priority ?? 'normal',
           pod_required: !!order.options?.pod_required,
           pickup: {
@@ -74,6 +81,14 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
     };
     void run();
   }, [mode, orderId]);
+
+  const onPickupValidityChange = useCallback((valid: boolean) => {
+    setLocationValidity((prev) => (prev.pickup === valid ? prev : { ...prev, pickup: valid }));
+  }, []);
+
+  const onDeliveryValidityChange = useCallback((valid: boolean) => {
+    setLocationValidity((prev) => (prev.delivery === valid ? prev : { ...prev, delivery: valid }));
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,25 +112,40 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
     setLocationErrors(nextErrors);
     if (nextErrors.pickup || nextErrors.delivery) return;
 
+    if (mode === 'create' && !customerUuid.trim()) {
+      setCustomerError('Select a customer.');
+      return;
+    }
+    setCustomerError(null);
+
     try {
       setSaving(true);
       setError(null);
-      const payload = {
+      const meta: Record<string, unknown> = {
+        priority: formData.priority || 'normal',
+        pickup: formData.pickup,
+        delivery: formData.delivery,
+      };
+      const base = {
         type: formData.type,
         internal_id: formData.internal_id,
         notes: formData.notes,
         scheduled_at: formData.scheduled_at,
         status: formData.status || 'created',
-        meta: {
-          customer_name: formData.customer_name,
-          priority: formData.priority || 'normal',
-          pickup: formData.pickup,
-          delivery: formData.delivery,
-        },
+        meta,
         options: { pod_required: formData.pod_required },
       };
-      if (mode === 'edit' && orderId) await ordersService.update(orderId, payload);
-      else await ordersService.create(payload);
+      if (mode === 'edit' && orderId) {
+        await ordersService.update(orderId, {
+          ...base,
+          ...(customerUuid.trim() ? { customer_uuid: customerUuid.trim() } : {}),
+        });
+      } else {
+        await ordersService.create({
+          ...base,
+          customer_uuid: customerUuid.trim(),
+        });
+      }
       await onSuccess();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : `Failed to ${mode} order`);
@@ -171,15 +201,17 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
               <option value="delivery">delivery</option>
             </Select>
           </FormField>
-          <FormField className="md:col-span-2" label="Customer Name (meta.customer_name)" required htmlFor="order-customer">
-            <Input
-              id="order-customer"
-              required
-              placeholder={PH.customerName}
-              value={formData.customer_name}
-              onChange={(e) => setFormData((p) => ({ ...p, customer_name: e.target.value }))}
-            />
-          </FormField>
+          <CustomerSelector
+            value={customerUuid}
+            initialLabel={customerLabel}
+            required
+            error={customerError}
+            onChange={(uuid, name) => {
+              setCustomerUuid(uuid);
+              setCustomerLabel(name);
+              setCustomerError(null);
+            }}
+          />
           <FormField className="md:col-span-2" label="Scheduled At" required htmlFor="order-scheduled">
             <Input
               id="order-scheduled"
@@ -226,7 +258,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
             label="Pickup Location"
             value={formData.pickup}
             error={locationErrors.pickup}
-            onValidityChange={(valid) => setLocationValidity((prev) => ({ ...prev, pickup: valid }))}
+            onValidityChange={onPickupValidityChange}
             onChange={(pickup) => {
               setFormData((p) => ({ ...p, pickup }));
               const nextErrors = { ...locationErrors, pickup: undefined };
@@ -247,7 +279,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
             label="Delivery Location"
             value={formData.delivery}
             error={locationErrors.delivery}
-            onValidityChange={(valid) => setLocationValidity((prev) => ({ ...prev, delivery: valid }))}
+            onValidityChange={onDeliveryValidityChange}
             onChange={(delivery) => {
               setFormData((p) => ({ ...p, delivery }));
               const nextErrors = { ...locationErrors, delivery: undefined };

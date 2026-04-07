@@ -21,12 +21,12 @@ from app.api.v1.routers import (
     devices,
     device_events,
     telematics,
-    storefront_customers,
     storefront_products,
     storefront_carts,
     storefront_orders,
     fleetops_issues,
     fleetops_fuel_reports,
+    fleetops_fleet_dashboard,
     fleetops_entities,
     fleetops_payloads,
     fleetops_zones,
@@ -55,7 +55,6 @@ from app.api.v1.routers import (
     int_storefront_votes,
     int_storefront_catalogs,
     int_storefront_catalog_hours,
-    int_storefront_customers,
     int_storefront_products,
     int_storefront_store_locations,
     int_storefront_gateways,
@@ -124,12 +123,12 @@ router.include_router(service_quotes.router)
 router.include_router(devices.router)
 router.include_router(device_events.router)
 router.include_router(telematics.router)
-router.include_router(storefront_customers.router)
 router.include_router(storefront_products.router)
 router.include_router(storefront_carts.router)
 router.include_router(storefront_orders.router)
 router.include_router(fleetops_issues.router)
 router.include_router(fleetops_fuel_reports.router)
+router.include_router(fleetops_fleet_dashboard.router)
 router.include_router(fleetops_entities.router)
 router.include_router(fleetops_payloads.router)
 router.include_router(fleetops_zones.router)
@@ -158,7 +157,6 @@ router.include_router(int_storefront_notification_channels.router)
 router.include_router(int_storefront_votes.router)
 router.include_router(int_storefront_catalogs.router)
 router.include_router(int_storefront_catalog_hours.router)
-router.include_router(int_storefront_customers.router)
 router.include_router(int_storefront_products.router)
 router.include_router(int_storefront_store_locations.router)
 router.include_router(int_storefront_gateways.router)

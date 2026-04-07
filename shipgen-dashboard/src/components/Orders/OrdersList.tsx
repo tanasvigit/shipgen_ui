@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Package, Search, Calendar, Edit, Eye } from 'lucide-react';
-import { ordersService, UiOrder } from '../../services/ordersService';
+import { ordersService, orderCustomerLabel, UiOrder } from '../../services/ordersService';
 import { Button } from '../ui/Button';
 import InputField from '../ui/InputField';
 import StatusBadge from '../ui/StatusBadge';
@@ -17,8 +17,20 @@ import { PH, SELECT_PH } from '../../constants/formPlaceholders';
 import Modal from '../common/Modal';
 import OrderForm from './forms/OrderForm';
 import OrderDetailsModal from './OrderDetailsModal';
+import { UserRole } from '../../types';
+import {
+  canAssignOrDispatchOrders,
+  canCreateOrders,
+  canEditOrders,
+  getStoredUserRole,
+} from '../../utils/roleAccess';
 
 const OrdersList: React.FC = () => {
+  const role = getStoredUserRole() ?? UserRole.VIEWER;
+  const mayCreate = canCreateOrders(role);
+  const mayEdit = canEditOrders(role);
+  const mayDispatch = canAssignOrDispatchOrders(role);
+
   const [orders, setOrders] = useState<UiOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -139,8 +151,8 @@ const OrdersList: React.FC = () => {
         key: 'customer',
         title: 'Customer',
         render: (order) => (
-          <span className="block max-w-[220px] truncate" title={order.meta?.customer_name || '-'}>
-            {order.meta?.customer_name || '-'}
+          <span className="block max-w-[220px] truncate" title={orderCustomerLabel(order)}>
+            {orderCustomerLabel(order)}
           </span>
         ),
       },
@@ -178,21 +190,25 @@ const OrdersList: React.FC = () => {
           );
         },
       },
-      {
-        key: 'dispatch',
-        title: 'Dispatch',
-        isActions: true,
-        render: (order) => (
-          <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            <Link
-              to={`/logistics/orders/dispatch-board?status=${encodeURIComponent((order.status || 'created').toLowerCase())}&orderId=${encodeURIComponent(order.id)}&source=orders`}
-              className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
-            >
-              Open
-            </Link>
-          </div>
-        ),
-      },
+      ...(mayDispatch
+        ? [
+            {
+              key: 'dispatch',
+              title: 'Dispatch',
+              isActions: true,
+              render: (order: UiOrder) => (
+                <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                  <Link
+                    to={`/logistics/orders/dispatch-board?status=${encodeURIComponent((order.status || 'created').toLowerCase())}&orderId=${encodeURIComponent(order.id)}&source=orders`}
+                    className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+                  >
+                    Open
+                  </Link>
+                </div>
+              ),
+            } as TableColumn<UiOrder>,
+          ]
+        : []),
       {
         key: 'actions',
         title: 'Actions',
@@ -202,22 +218,27 @@ const OrdersList: React.FC = () => {
             <Button variant="ghost" size="sm" aria-label="View order" className="w-9 px-0" onClick={() => openDetails(order.id)}>
               <Eye size={16} />
             </Button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditingId(order.id);
-                setIsEditOpen(true);
-              }}
-            >
-              <Button variant="outline" size="sm" aria-label="Edit order" className="w-9 px-0">
+            {mayEdit ? (
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label="Edit order"
+                type="button"
+                className="w-9 px-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingId(order.id);
+                  setIsEditOpen(true);
+                }}
+              >
                 <Edit size={16} />
               </Button>
-            </button>
+            ) : null}
           </div>
         ),
       },
     ],
-    [openDetails]
+    [openDetails, mayDispatch, mayEdit]
   );
 
   return (
@@ -225,7 +246,7 @@ const OrdersList: React.FC = () => {
       <PageHeader
         title="Orders"
         description="Manage customer orders"
-        action={<Button onClick={() => setIsCreateOpen(true)}>Create Order</Button>}
+        action={mayCreate ? <Button onClick={() => setIsCreateOpen(true)}>Create Order</Button> : undefined}
       />
 
       <FiltersBar>
@@ -283,8 +304,10 @@ const OrdersList: React.FC = () => {
           loading={loading}
           emptyState={{
             title: 'No orders found',
-            description: 'Try adjusting your filters or create a new order to get started.',
-            action: <Button onClick={() => setIsCreateOpen(true)}>Create Order</Button>,
+            description: mayCreate
+              ? 'Try adjusting your filters or create a new order to get started.'
+              : 'Try adjusting your filters.',
+            action: mayCreate ? <Button onClick={() => setIsCreateOpen(true)}>Create Order</Button> : undefined,
           }}
           pagination={{
             page,

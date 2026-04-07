@@ -72,17 +72,19 @@ def client(db_session):
 
 
 @pytest.fixture
-def test_user(db_session):
-    """Create a test user."""
+def test_user(db_session, test_company):
+    """Create a test user scoped to test_company (fleetops tenancy)."""
     user_uuid = str(uuid.uuid4())
     user = User(
         uuid=user_uuid,
         public_id="test_user_123",
+        company_uuid=test_company.uuid,
         name="Test User",
         email="test@example.com",
         password=get_password_hash("password123"),
         phone="+1234567890",
         type="user",
+        role="ADMIN",
     )
     db_session.add(user)
     db_session.commit()
@@ -99,7 +101,6 @@ def test_company(db_session):
         public_id="test_company_123",
         name="Test Company",
         phone="+1234567890",
-        email="company@example.com",
     )
     db_session.add(company)
     db_session.commit()
@@ -183,10 +184,9 @@ def test_driver(db_session, test_company, test_user):
         public_id="test_driver_123",
         company_uuid=test_company.uuid,
         user_uuid=test_user.uuid,
-        name="Test Driver",
-        phone="+1234567890",
-        email="driver@example.com",
+        drivers_license_number="DL-TEST-001",
         status="active",
+        online=0,
     )
     db_session.add(driver)
     db_session.commit()
@@ -216,7 +216,26 @@ def test_vehicle(db_session, test_company, test_driver):
 
 
 @pytest.fixture
-def test_order(db_session, test_company, test_driver):
+def test_customer_contact(db_session, test_company):
+    """Customer contact (type=customer) for order FK tests."""
+    contact_uuid = str(uuid.uuid4())
+    contact = Contact(
+        uuid=contact_uuid,
+        public_id="test_customer_contact_123",
+        company_uuid=test_company.uuid,
+        name="Test Customer",
+        type="customer",
+        phone="+10987654321",
+        email="customer@test.example",
+    )
+    db_session.add(contact)
+    db_session.commit()
+    db_session.refresh(contact)
+    return contact
+
+
+@pytest.fixture
+def test_order(db_session, test_company, test_driver, test_customer_contact):
     """Create a test order."""
     order_uuid = str(uuid.uuid4())
     order = Order(
@@ -224,6 +243,9 @@ def test_order(db_session, test_company, test_driver):
         public_id="test_order_123",
         company_uuid=test_company.uuid,
         driver_assigned_uuid=test_driver.uuid,
+        customer_uuid=test_customer_contact.uuid,
+        customer_type="customer",
+        type="pickup",
         internal_id="ORD-001",
         status="pending",
     )

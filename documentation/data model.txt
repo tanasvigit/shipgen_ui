@@ -1,0 +1,420 @@
+================================================================================
+DATA MODEL (END-TO-END DETAILED) — SHIPGEN LOGISTICS PLATFORM
+================================================================================
+Purpose:
+This document defines the end-to-end data model used by the platform, including:
+- core entities,
+- key fields,
+- relationships,
+- tenancy and RBAC behavior,
+- lifecycle states,
+- API response model mapping.
+
+Scope:
+- `fastapi-app/app/models/*` (SQLAlchemy ORM)
+- `fastapi-app/app/schemas/*` (Pydantic API contracts)
+- frontend business consumption (`shipgen-dashboard/src/services/*`)
+
+--------------------------------------------------------------------------------
+1) MODELING PRINCIPLES
+--------------------------------------------------------------------------------
+
+1. Multi-tenant first
+- Most operational entities include `company_uuid`.
+- Data access is scoped by authenticated user company where enforced.
+
+2. UUID-centric business identity
+- Tables commonly include `uuid` and often `public_id`.
+- Integer `id` is internal PK; `uuid/public_id` used in APIs and UI.
+
+3. Soft-delete pattern
+- Many entities use `deleted_at`; active records are queried with `deleted_at IS NULL`.
+
+4. Extensible JSON attributes
+- `meta` and `options` fields store variable business attributes without schema churn.
+
+5. Consistent audit timestamps
+- `created_at` and `updated_at` across most tables.
+
+--------------------------------------------------------------------------------
+2) CORE PLATFORM DOMAIN
+--------------------------------------------------------------------------------
+
+2.1 users
+Business purpose:
+- Identity, authentication principal, role and tenant anchor.
+
+Important fields:
+- id (PK, int)
+- uuid, public_id
+- company_uuid
+- username, email, phone, password
+- name, role, type, status
+- meta (json)
+- email_verified_at, phone_verified_at
+- deleted_at, created_at, updated_at
+
+Business notes:
+- `role` stores logistics role strings (ADMIN, OPERATIONS_MANAGER, DISPATCHER,
+  DRIVER, VIEWER).
+- `company_uuid` drives tenant scoping.
+
+2.2 companies
+Business purpose:
+- Tenant/business organization master.
+
+Important fields:
+- id, uuid, public_id
+- name, description, phone, website_url
+- currency, country, timezone
+- status, slug, options
+- created_at, updated_at
+
+2.3 company_users
+Business purpose:
+- Membership relation between users and companies.
+
+Typical relationship:
+- company_users.user_uuid -> users.uuid
+- company_users.company_uuid -> companies.uuid
+
+--------------------------------------------------------------------------------
+3) RBAC / AUTHORIZATION DOMAIN
+--------------------------------------------------------------------------------
+
+Primary entities:
+- roles
+- permissions
+- policies
+- pivot/link tables (role-user, role-permission style mappings)
+
+User role behavior:
+- User.role is normalized by backend helper (`effective_user_role`).
+- Unknown/empty role defaults to DISPATCHER in logic.
+
+Auth/session support entities:
+- twofa settings/sessions
+- notification and session-related helpers (plus Redis cache for selected flows)
+
+--------------------------------------------------------------------------------
+4) FLEET OPERATIONS DOMAIN (PRIMARY BUSINESS MODEL)
+--------------------------------------------------------------------------------
+
+4.1 orders
+Business purpose:
+- Central transaction unit for logistics execution.
+
+Key fields:
+- id, uuid, public_id
+- company_uuid
+- internal_id
+- customer_uuid, customer_type
+- driver_assigned_uuid, vehicle_assigned_uuid
+- status, type
+- notes, scheduled_at
+- dispatched, dispatched_at
+- started, started_at
+- pod_required, pod_method
+- distance, time, adhoc, adhoc_distance
+- is_route_optimized
+- meta (json), options (json)
+- deleted_at, created_at, updated_at
+
+Common `meta` structure used by UI:
+- priority
+- pickup: { address, lat, lng }
+- delivery: { address, lat, lng }
+
+Common `options` structure:
+- pod_required
+
+4.2 drivers
+Business purpose:
+- Driver master and runtime operational state.
+
+Key fields:
+- id, uuid, public_id
+- company_uuid
+- user_uuid
+- vehicle_uuid (persistent link)
+- vendor_uuid, current_job_uuid
+- drivers_license_number
+- status
+- online (0/1 int)
+- latitude, longitude, heading, speed, altitude (stored as strings in model)
+- country, city, currency
+- deleted_at, created_at, updated_at
+
+4.3 vehicles
+Business purpose:
+- Vehicle inventory with assignment and telemetry context.
+
+Key fields:
+- id, uuid, public_id
+- company_uuid
+- vendor_uuid
+- make, model, year, trim, type
+- plate_number, vin
+- vin_data (json)
+- status
+- meta (json) (includes dynamic telemetry/notes)
+- deleted_at, created_at, updated_at
+
+Common `meta` usage:
+- latitude, longitude
+- color, notes
+
+4.4 contacts
+Business purpose:
+- Generic people/contact master; customers are represented here via `type`.
+
+Key fields:
+- id, uuid, public_id
+- company_uuid
+- user_uuid
+- name, title, email, phone
+- type (contact/customer/etc.)
+- meta (json; e.g., customer address)
+- created_at, updated_at
+
+4.5 Additional fleet support entities
+- vendors
+- places
+- issues
+- fuel_reports
+- fleets
+- zones
+- service_areas
+- tracking_numbers
+- tracking_statuses
+- entities
+- payloads
+- service_rates
+- service_quotes
+
+These entities support execution planning, categorization, exceptions, and
+operational reporting around orders.
+
+--------------------------------------------------------------------------------
+5) STOREFRONT DOMAIN
+--------------------------------------------------------------------------------
+
+Primary entities include:
+- storefront_products
+- storefront_categories
+- storefront_reviews
+- storefront_carts
+- storefront_orders
+- storefront_checkouts
+- storefront_stores
+- storefront_networks
+- storefront_food_trucks
+- storefront variants/addons/catalog-related tables
+
+Purpose:
+- commerce/order capture and store/network management; can integrate with
+  logistics workflows depending on deployment.
+
+--------------------------------------------------------------------------------
+6) PLATFORM UTILITIES DOMAIN
+--------------------------------------------------------------------------------
+
+Representative entities:
+- files
+- comments
+- settings
+- webhook_endpoints / webhook_request_logs
+- dashboards / dashboard_widgets
+- reports
+- chat_channels / chat_messages / participants / attachments / receipts
+- api_credentials / api_events / api_request_logs
+- activities
+- extensions / extension_install
+- custom_fields / custom_field_values
+- transactions / transaction_items
+- schedules / schedule_items / templates / availability / constraints / monitor
+- groups / group_user
+- user_devices
+- lookup-related tables
+
+Purpose:
+- system administration, integration, observability, extensibility, and
+  collaboration around core logistics business flows.
+
+--------------------------------------------------------------------------------
+7) KEY RELATIONSHIPS (BUSINESS-CRITICAL)
+--------------------------------------------------------------------------------
+
+Tenant and identity:
+- companies.uuid 1 -> * users.company_uuid
+- companies.uuid 1 -> * orders/drivers/vehicles/contacts/...company_uuid
+
+Operational assignment:
+- drivers.vehicle_uuid -> vehicles.uuid (persistent relation)
+- orders.driver_assigned_uuid -> drivers.uuid (runtime dispatch relation)
+- orders.vehicle_assigned_uuid -> vehicles.uuid (runtime dispatch relation)
+
+Customer linkage:
+- orders.customer_uuid -> contacts.uuid (type=customer in logistics UI pattern)
+
+Driver user linkage:
+- drivers.user_uuid -> users.uuid (used for DRIVER scoped access behavior)
+
+Important modeling nuance:
+- runtime order assignment may exist even when driver.vehicle_uuid is null.
+- dashboard and unassigned logic must consider both persistent and runtime links.
+
+--------------------------------------------------------------------------------
+8) STATUS / LIFECYCLE MODEL
+--------------------------------------------------------------------------------
+
+Order lifecycle (implemented/guarded in orchestration flow):
+- created
+- assigned
+- dispatched
+- arrived_at_pickup
+- picked_up
+- in_transit
+- out_for_delivery
+- delivered
+- completed
+
+Common terminal statuses used in KPI logic:
+- completed
+- cancelled
+- failed
+
+Driver status:
+- commonly active/inactive (with online flag orthogonal)
+
+Vehicle status:
+- active / maintenance / inactive (UI-constrained values)
+
+--------------------------------------------------------------------------------
+9) UNASSIGNED AND UTILIZATION LOGIC (DATA SEMANTICS)
+--------------------------------------------------------------------------------
+
+Driver unassigned semantic:
+- driver.vehicle_uuid is null/empty
+AND
+- driver not assigned to any active (non-terminal, non-deleted) order.
+
+Vehicle unassigned semantic:
+- no active driver linked via driver.vehicle_uuid
+AND
+- vehicle not assigned to any active (non-terminal, non-deleted) order.
+
+Vehicles in use:
+- distinct active orders.vehicle_assigned_uuid count.
+
+These semantics are used by dashboard KPIs and list filters.
+
+--------------------------------------------------------------------------------
+10) API SCHEMA LAYER MAPPING (Pydantic)
+--------------------------------------------------------------------------------
+
+Orders:
+- `OrderCreate`, `OrderUpdate`, `OrderOut`, `OrderResponse`, `OrdersResponse`
+- Includes API-enriched `customer_display_name` in responses.
+
+Drivers:
+- `DriverCreate`, `DriverUpdate`, `DriverOut`
+- `DriverOut` coerces latitude/longitude to float|null for API consistency.
+- Paginated list shape: `DriversListResponse {data,total,limit,offset}`.
+
+Vehicles:
+- `VehicleCreate`, `VehicleUpdate`, `VehicleOut`
+- `VehicleOut` can derive latitude/longitude from `meta`.
+- Paginated list shape: `VehiclesListResponse {data,total,limit,offset}`.
+
+Contacts:
+- `ContactCreate`, `ContactUpdate`, `ContactOut`.
+
+Auth:
+- `LoginRequest`, `LoginResponse`, `MeUser`, `SessionData`, etc.
+
+Fleet Dashboard:
+- `FleetDashboardResponse` with `kpis`, `drivers[]`, `vehicles[]`.
+
+--------------------------------------------------------------------------------
+11) FRONTEND DATA CONTRACT VIEW (UI MODELS)
+--------------------------------------------------------------------------------
+
+UI service layer normalizes backend data for components:
+- `ordersService` maps backend order payload -> `UiOrder`.
+- `driversService` / `vehiclesService` map list/detail payloads to UI tables/forms.
+- `customersService` wraps contacts service with customer-specific semantics.
+- `fleetDashboardService` consumes aggregated KPI+table payload.
+
+Important UI normalization patterns:
+- ID normalization prefers uuid/public_id for stable routing.
+- Status strings normalized to lowercase in orders.
+- API list pagination normalized across legacy and new response formats.
+
+--------------------------------------------------------------------------------
+12) TENANCY + SECURITY DATA RULES
+--------------------------------------------------------------------------------
+
+1. Never trust tenant identifiers from client payload where backend can derive
+   from current authenticated user context.
+2. For sensitive read paths, prefer scoped lookup and return 404 for out-of-tenant
+   resource IDs.
+3. Enforce mutate permissions on server regardless of UI visibility.
+4. Avoid exposing cross-company joins without explicit controls.
+
+--------------------------------------------------------------------------------
+13) MIGRATION EVOLUTION (HIGH LEVEL)
+--------------------------------------------------------------------------------
+
+Alembic versions reflect progressive expansion from core to enterprise breadth:
+- core users/companies,
+- fleet orders/drivers/vehicles,
+- RBAC,
+- storefront,
+- telematics/devices,
+- utilities,
+- latest user role RBAC migration.
+
+Migration path indicates monolith-first unified schema strategy.
+
+--------------------------------------------------------------------------------
+14) DATA QUALITY AND GOVERNANCE CHECKLIST
+--------------------------------------------------------------------------------
+
+Recommended controls:
+- Enforce role enum validity for users.
+- Ensure every active operational user has company_uuid.
+- Validate orders have valid customer_uuid and schedule.
+- Avoid orphaned assignments (deleted driver/vehicle referenced by active order).
+- Keep status values normalized (lowercase canonical).
+- Monitor null/invalid telemetry and optional meta misuse.
+
+--------------------------------------------------------------------------------
+15) REFERENCE INDEX (MODELING HOTSPOTS)
+--------------------------------------------------------------------------------
+
+Core DB/session/config:
+- fastapi-app/app/core/database.py
+- fastapi-app/app/core/config.py
+
+Core models:
+- fastapi-app/app/models/user.py
+- fastapi-app/app/models/company.py
+- fastapi-app/app/models/order.py
+- fastapi-app/app/models/driver.py
+- fastapi-app/app/models/vehicle.py
+- fastapi-app/app/models/contact.py
+
+Core schemas:
+- fastapi-app/app/schemas/user.py
+- fastapi-app/app/schemas/company.py
+- fastapi-app/app/schemas/order.py
+- fastapi-app/app/schemas/driver.py
+- fastapi-app/app/schemas/vehicle.py
+- fastapi-app/app/schemas/contact.py
+- fastapi-app/app/schemas/fleet_dashboard.py
+- fastapi-app/app/schemas/auth.py
+
+--------------------------------------------------------------------------------
+END OF DATA MODEL DOCUMENT
+--------------------------------------------------------------------------------

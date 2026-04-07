@@ -4,25 +4,33 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.api.v1.routers.auth import _get_current_user
 from app.core.database import get_db
-from app.core.security import verify_password, get_password_hash
+from app.core.roles import ADMIN, ALL_ROLES, DISPATCHER, require_roles
+from app.core.security import get_password_hash, verify_password
 from app.models.twofa import TwoFaSetting
 from app.models.user import User
 from app.schemas.user import UserCreate, UserOut, UserUpdate
-from app.api.v1.routers.auth import _get_current_user
 
 router = APIRouter(prefix="/int/v1/users", tags=["users"])
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
+def _normalize_role(raw: str | None) -> str:
+    r = (raw or DISPATCHER).strip().upper()
+    return r if r in ALL_ROLES else DISPATCHER
+
+
 @router.get("/", response_model=List[UserOut])
 def list_users(
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN)),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
     query = db.query(User).filter(User.deleted_at.is_(None))
+    if current.company_uuid:
+        query = query.filter(User.company_uuid == current.company_uuid)
     users = query.offset(offset).limit(limit).all()
     return users
 
@@ -39,10 +47,12 @@ def current_user(
 def get_user(
     user_id: str,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN)),
 ):
     user = db.query(User).filter(User.uuid == user_id).first()
     if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    if current.company_uuid and user.company_uuid and user.company_uuid != current.company_uuid:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
     return user
 
@@ -51,15 +61,16 @@ def get_user(
 def create_user(
     payload: UserCreate,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN)),
 ):
     user = User()
     user.name = payload.name
     user.email = payload.email
     user.phone = payload.phone
-    user.company_uuid = payload.company_uuid
+    user.company_uuid = payload.company_uuid or current.company_uuid
     user.timezone = payload.timezone
     user.country = payload.country
+    user.role = _normalize_role(payload.role)
     if payload.password:
         user.password = get_password_hash(payload.password)
 
@@ -76,13 +87,18 @@ def update_user(
     user_id: str,
     payload: UserUpdate,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN)),
 ):
     user = db.query(User).filter(User.uuid == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    if current.company_uuid and user.company_uuid and user.company_uuid != current.company_uuid:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
 
-    for field, value in payload.dict(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    if "role" in data:
+        user.role = _normalize_role(data.pop("role"))
+    for field, value in data.items():
         setattr(user, field, value)
 
     db.add(user)
@@ -96,10 +112,12 @@ def update_user(
 def delete_user(
     user_id: str,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN)),
 ):
     user = db.query(User).filter(User.uuid == user_id).first()
     if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    if current.company_uuid and user.company_uuid and user.company_uuid != current.company_uuid:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
 
     user.deleted_at = user.deleted_at or user.updated_at

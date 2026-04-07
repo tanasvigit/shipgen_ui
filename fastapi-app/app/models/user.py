@@ -25,6 +25,7 @@ class User(Base):
     last_login: Mapped[str | None] = mapped_column(String(255))
     slug: Mapped[str | None] = mapped_column(String(255))
     type: Mapped[str | None] = mapped_column(String(191), index=True)
+    role: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     status: Mapped[str | None] = mapped_column(String(255))
     meta: Mapped[dict | None] = mapped_column(JSON)
     remember_token: Mapped[str | None] = mapped_column(String(100))

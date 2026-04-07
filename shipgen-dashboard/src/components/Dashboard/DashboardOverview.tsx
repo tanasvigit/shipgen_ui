@@ -6,6 +6,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { dashboardOverviewService, type DashboardOverviewData } from '../../services/dashboardOverviewService';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { applyRangeToOverview, type DashboardRange } from '../../utils/dashboardHelpers';
+import { orderCustomerLabel, type UiOrder } from '../../services/ordersService';
 
 const DashboardOverview: React.FC = () => {
   const [overview, setOverview] = useState<DashboardOverviewData | null>(null);
@@ -251,7 +252,7 @@ const DashboardOverview: React.FC = () => {
                       )}
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{String(order.status ?? '—')}</span>
                     </div>
-                    <p className="text-sm font-medium text-gray-900">{String(((order.meta as Record<string, unknown> | undefined)?.customer_name ?? '—'))}</p>
+                    <p className="text-sm font-medium text-gray-900">{orderCustomerLabel(order as unknown as UiOrder)}</p>
                     <p className="text-xs text-gray-600 truncate">{String(order.internal_id ?? order.uuid ?? order.id ?? '—')}</p>
                   </div>
                   <div className="text-xs text-gray-500">{order.created_at ? new Date(String(order.created_at)).toLocaleDateString() : '—'}</div>

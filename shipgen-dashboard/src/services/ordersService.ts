@@ -10,6 +10,10 @@ export interface UiOrder {
   notes: string;
   scheduled_at: string;
   status: string;
+  /** Resolved customer link; required for new orders from the API. */
+  customer_uuid?: string;
+  /** API-enriched display name (preferred over meta.customer_name). */
+  customer_display_name?: string;
   driver_assigned_uuid?: string;
   vehicle_assigned_uuid?: string;
   meta: {
@@ -43,6 +47,8 @@ interface BackendOrder {
   notes?: string | null;
   scheduled_at?: string | null;
   status?: string | null;
+  customer_uuid?: string | null;
+  customer_display_name?: string | null;
   driver_assigned_uuid?: string | null;
   vehicle_assigned_uuid?: string | null;
   pod_required?: boolean | null;
@@ -89,6 +95,8 @@ const mapBackendOrderToUi = (order: BackendOrder): UiOrder => {
     notes: String(order.notes ?? ''),
     scheduled_at: toIsoOrEmpty(order.scheduled_at),
     status: normalizeStatus(order.status),
+    customer_uuid: order.customer_uuid ? String(order.customer_uuid) : undefined,
+    customer_display_name: order.customer_display_name ? String(order.customer_display_name) : undefined,
     driver_assigned_uuid: String(order.driver_assigned_uuid ?? ''),
     vehicle_assigned_uuid: String(order.vehicle_assigned_uuid ?? ''),
     meta: {
@@ -130,6 +138,13 @@ const mapBackendOrderToUi = (order: BackendOrder): UiOrder => {
     updated_at: toIsoOrEmpty(order.updated_at),
   };
 };
+
+/** Prefer API-resolved name; fall back to legacy meta.customer_name. */
+export function orderCustomerLabel(order: UiOrder): string {
+  const fromMeta = String(order.meta?.customer_name ?? '').trim();
+  const resolved = String(order.customer_display_name ?? '').trim();
+  return resolved || fromMeta || '—';
+}
 
 class OrdersService {
   async list(params: {
@@ -188,6 +203,7 @@ class OrdersService {
 
   async create(input: Omit<UiOrder, 'id' | 'created_at' | 'updated_at'>): Promise<UiOrder> {
     const payload = await apiClient.post<unknown>(`${ORDERS_BASE_PATH}/`, {
+      customer_uuid: input.customer_uuid ?? null,
       type: input.type,
       internal_id: input.internal_id || null,
       notes: input.notes || null,
@@ -200,7 +216,7 @@ class OrdersService {
   }
 
   async update(id: string, input: Partial<Omit<UiOrder, 'id' | 'created_at' | 'updated_at'>>): Promise<UiOrder> {
-    const payload = await apiClient.patch<unknown>(`${ORDERS_BASE_PATH}/${id}`, {
+    const body: Record<string, unknown> = {
       type: input.type,
       internal_id: input.internal_id ?? null,
       notes: input.notes ?? null,
@@ -208,7 +224,12 @@ class OrdersService {
       status: input.status ?? null,
       meta: input.meta ?? {},
       options: input.options ?? {},
-    });
+    };
+    const cid = input.customer_uuid;
+    if (cid !== undefined && cid !== null && String(cid).trim() !== '') {
+      body.customer_uuid = String(cid).trim();
+    }
+    const payload = await apiClient.patch<unknown>(`${ORDERS_BASE_PATH}/${id}`, body);
     const row = normalizeSingle<BackendOrder>(payload, ['order']);
     return mapBackendOrderToUi((row ?? {}) as BackendOrder);
   }

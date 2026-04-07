@@ -14,7 +14,12 @@ class TestVehicleList:
         response = client.get("/fleetops/v1/vehicles", headers=auth_headers)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert isinstance(data, list)
+        assert "data" in data
+        assert "total" in data
+        assert "limit" in data
+        assert "offset" in data
+        assert isinstance(data["data"], list)
+        assert data["total"] >= 1
 
     def test_list_vehicles_no_auth(self, client):
         """Test listing vehicles without authentication."""
@@ -31,8 +36,9 @@ class TestVehicleGet:
         response = client.get(f"/fleetops/v1/vehicles/{test_vehicle.public_id}", headers=auth_headers)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["public_id"] == test_vehicle.public_id
-        assert data["vin"] == test_vehicle.vin
+        assert "vehicle" in data
+        assert data["vehicle"]["public_id"] == test_vehicle.public_id
+        assert data["vehicle"]["vin"] == test_vehicle.vin
 
     def test_get_vehicle_not_found(self, client, auth_headers):
         """Test getting non-existent vehicle."""
@@ -60,10 +66,11 @@ class TestVehicleCreate:
         )
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
-        assert data["make"] == "Toyota"
-        assert data["model"] == "Camry"
-        assert "public_id" in data
-        assert "uuid" in data
+        assert "vehicle" in data
+        assert data["vehicle"]["make"] == "Toyota"
+        assert data["vehicle"]["model"] == "Camry"
+        assert "public_id" in data["vehicle"]
+        assert "uuid" in data["vehicle"]
 
 
 @pytest.mark.fleetops
@@ -81,7 +88,7 @@ class TestVehicleUpdate:
         )
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["plate_number"] == "UPDATED123"
+        assert data["vehicle"]["plate_number"] == "UPDATED123"
 
 
 @pytest.mark.fleetops
@@ -89,13 +96,12 @@ class TestVehicleAssignDriver:
     """Test vehicle driver assignment endpoint."""
 
     def test_assign_driver_to_vehicle(self, client, auth_headers, test_vehicle, test_driver):
-        """Test assigning a driver to a vehicle."""
+        """Test assigning a driver to a vehicle (query param driver_uuid)."""
         response = client.post(
             f"/fleetops/v1/vehicles/{test_vehicle.public_id}/assign-driver",
             headers=auth_headers,
-            json={
-                "driver_uuid": test_driver.uuid,
-            },
+            params={"driver_uuid": test_driver.uuid},
         )
-        assert response.status_code in [status.HTTP_200_OK, status.HTTP_404_NOT_FOUND]
-
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        assert "vehicle" in body

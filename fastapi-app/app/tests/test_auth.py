@@ -22,10 +22,12 @@ class TestAuthLogin:
         )
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data.get("id") == test_user.uuid
         assert "token" in data
         assert data["type"] == test_user.type
         assert len(data["token"]) > 0
+        user_obj = data.get("user") or {}
+        assert user_obj.get("id") == test_user.uuid
+        assert user_obj.get("role") == "ADMIN"
 
     def test_login_with_phone_success(self, client, db_session, test_user):
         """Test successful login with phone number."""
@@ -70,7 +72,7 @@ class TestAuthLogin:
             "/int/v1/auth/login",
             json={},
         )
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 @pytest.mark.auth

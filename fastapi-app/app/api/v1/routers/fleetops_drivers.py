@@ -1,18 +1,28 @@
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
+from sqlalchemy import and_, exists, not_, or_
 from sqlalchemy.orm import Session
 
 from app.api.v1.routers.auth import _get_current_user
+from app.core.company_scope import require_company_uuid
 from app.core.database import get_db
 from app.models.driver import Driver
+from app.models.order import Order
 from app.models.user import User
-from app.schemas.driver import DriverCreate, DriverOut, DriverUpdate, DriverResponse, DriversResponse
+from app.schemas.driver import (
+    DriverCreate,
+    DriverOut,
+    DriverUpdate,
+    DriverResponse,
+    DriversListResponse,
+)
 
 router = APIRouter(prefix="/fleetops/v1/drivers", tags=["fleetops-drivers"])
+TERMINAL_ORDER_STATUSES = ("completed", "cancelled", "failed")
 
 
 class DriverTrackBody(BaseModel):
@@ -31,31 +41,76 @@ class DriverSwitchOrgBody(BaseModel):
     company_uuid: str
 
 
-@router.get("/", response_model=DriversResponse)
+def _get_driver_for_company(
+    db: Session, *, company_uuid: str, driver_id: str, include_deleted: bool = False
+) -> Driver | None:
+    q = db.query(Driver).filter(
+        Driver.company_uuid == company_uuid,
+        (Driver.uuid == driver_id) | (Driver.public_id == driver_id),
+    )
+    if not include_deleted:
+        q = q.filter(Driver.deleted_at.is_(None))
+    return q.first()
+
+
+@router.get("/", response_model=DriversListResponse)
 def list_drivers(
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     status_filter: str | None = Query(None, alias="status"),
+    online: int | None = Query(None, ge=0, le=1),
+    unassigned: bool = Query(False),
+    vehicle_uuid: str | None = Query(None, description="Filter drivers assigned to this vehicle uuid"),
 ):
-    query = db.query(Driver).filter(Driver.deleted_at.is_(None))
+    company_uuid = require_company_uuid(current)
+    query = db.query(Driver).filter(
+        Driver.company_uuid == company_uuid,
+        Driver.deleted_at.is_(None),
+    )
     if status_filter:
         query = query.filter(Driver.status == status_filter)
+    if online is not None:
+        query = query.filter(Driver.online == online)
+    if unassigned:
+        active_order_for_driver = exists().where(
+            and_(
+                Order.company_uuid == company_uuid,
+                Order.deleted_at.is_(None),
+                Order.driver_assigned_uuid.isnot(None),
+                Order.driver_assigned_uuid != "",
+                Order.driver_assigned_uuid == Driver.uuid,
+                Order.status.notin_(list(TERMINAL_ORDER_STATUSES)),
+            )
+        )
+        query = query.filter(
+            or_(Driver.vehicle_uuid.is_(None), Driver.vehicle_uuid == ""),
+            not_(active_order_for_driver),
+        )
+    if vehicle_uuid:
+        query = query.filter(Driver.vehicle_uuid == vehicle_uuid)
+    total = query.count()
     drivers = query.offset(offset).limit(limit).all()
-    return {"drivers": drivers}
+    return DriversListResponse(
+        data=[DriverOut.model_validate(d) for d in drivers],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/{driver_id}", response_model=DriverResponse)
 def get_driver(
     driver_id: str,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
 ):
-    driver = db.query(Driver).filter(Driver.uuid == driver_id).first()
+    company_uuid = require_company_uuid(current)
+    driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_id)
     if not driver:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found.")
-    return {"driver": driver}
+    return DriverResponse(driver=DriverOut.model_validate(driver))
 
 
 @router.post("/", response_model=DriverResponse, status_code=status.HTTP_201_CREATED)
@@ -64,10 +119,11 @@ def create_driver(
     db: Session = Depends(get_db),
     current: User = Depends(_get_current_user),
 ):
+    company_uuid = require_company_uuid(current)
     driver = Driver()
     driver.uuid = str(uuid.uuid4())
     driver.public_id = f"driver_{uuid.uuid4().hex[:12]}"
-    driver.company_uuid = payload.company_uuid or current.company_uuid
+    driver.company_uuid = company_uuid
     driver.user_uuid = payload.user_uuid
     driver.drivers_license_number = payload.drivers_license_number
     driver.status = payload.status
@@ -77,7 +133,7 @@ def create_driver(
     db.commit()
     db.refresh(driver)
 
-    return {"driver": driver}
+    return DriverResponse(driver=DriverOut.model_validate(driver))
 
 
 @router.post("/register-device")
@@ -90,10 +146,11 @@ def register_device_global():
 def track_driver_global(
     payload: DriverTrackBody,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
 ):
     """POST /drivers/track – update location for a driver by driver_id in body."""
-    driver = db.query(Driver).filter(Driver.uuid == payload.driver_id).first()
+    company_uuid = require_company_uuid(current)
+    driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=payload.driver_id)
     if not driver:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found.")
     if payload.latitude is not None:
@@ -109,24 +166,31 @@ def track_driver_global(
     db.add(driver)
     db.commit()
     db.refresh(driver)
-    return {"driver": driver}
+    return DriverResponse(driver=DriverOut.model_validate(driver))
 
 
 @router.post("/switch-organization", response_model=DriverResponse)
 def switch_organization_global(
     payload: DriverSwitchOrgBody,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
 ):
-    """POST /drivers/switch-organization – switch driver to another company by body."""
-    driver = db.query(Driver).filter(Driver.uuid == payload.driver_id).first()
+    """POST /drivers/switch-organization – restricted to current company (no cross-tenant moves)."""
+    company_uuid = require_company_uuid(current)
+    driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=payload.driver_id)
     if not driver:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found.")
-    driver.company_uuid = payload.company_uuid
+    target = str(payload.company_uuid).strip()
+    if target != company_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="company_uuid must match the authenticated user's company.",
+        )
+    driver.company_uuid = company_uuid
     db.add(driver)
     db.commit()
     db.refresh(driver)
-    return {"driver": driver}
+    return DriverResponse(driver=DriverOut.model_validate(driver))
 
 
 @router.put("/{driver_id}", response_model=DriverResponse)
@@ -135,29 +199,31 @@ def update_driver(
     driver_id: str,
     payload: DriverUpdate,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
 ):
-    driver = db.query(Driver).filter(Driver.uuid == driver_id).first()
+    company_uuid = require_company_uuid(current)
+    driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_id)
     if not driver:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found.")
 
-    for field, value in payload.dict(exclude_unset=True).items():
+    for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(driver, field, value)
 
     db.add(driver)
     db.commit()
     db.refresh(driver)
 
-    return {"driver": driver}
+    return DriverResponse(driver=DriverOut.model_validate(driver))
 
 
 @router.delete("/{driver_id}", response_model=DriverResponse)
 def delete_driver(
     driver_id: str,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
 ):
-    driver = db.query(Driver).filter(Driver.uuid == driver_id).first()
+    company_uuid = require_company_uuid(current)
+    driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_id)
     if not driver:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found.")
 
@@ -165,16 +231,18 @@ def delete_driver(
     db.add(driver)
     db.commit()
     db.refresh(driver)
-    return {"driver": driver}
+
+    return DriverResponse(driver=DriverOut.model_validate(driver))
 
 
 @router.post("/{driver_id}/toggle-online", response_model=DriverResponse)
 def toggle_online(
     driver_id: str,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
 ):
-    driver = db.query(Driver).filter(Driver.uuid == driver_id).first()
+    company_uuid = require_company_uuid(current)
+    driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_id)
     if not driver:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found.")
 
@@ -182,7 +250,8 @@ def toggle_online(
     db.add(driver)
     db.commit()
     db.refresh(driver)
-    return {"driver": driver}
+
+    return DriverResponse(driver=DriverOut.model_validate(driver))
 
 
 @router.post("/{driver_id}/track", response_model=DriverResponse)
@@ -190,30 +259,33 @@ def track_driver_per_id(
     driver_id: str,
     payload: DriverUpdate,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
 ):
-    driver = db.query(Driver).filter(Driver.uuid == driver_id).first()
+    company_uuid = require_company_uuid(current)
+    driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_id)
     if not driver:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found.")
 
-    for field, value in payload.dict(exclude_unset=True).items():
+    for field, value in payload.model_dump(exclude_unset=True).items():
         if field in {"latitude", "longitude", "heading", "speed", "altitude"}:
             setattr(driver, field, value)
 
     db.add(driver)
     db.commit()
     db.refresh(driver)
-    return {"driver": driver}
+
+    return DriverResponse(driver=DriverOut.model_validate(driver))
 
 
 @router.post("/{driver_id}/register-device")
 def register_device_for_driver(
     driver_id: str,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
 ):
     """Stub endpoint for per-driver device registration."""
-    driver = db.query(Driver).filter(Driver.uuid == driver_id).first()
+    company_uuid = require_company_uuid(current)
+    driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_id)
     if not driver:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found.")
     return {"status": "ok", "driver_uuid": driver.uuid}
@@ -224,24 +296,25 @@ def switch_organization(
     driver_id: str,
     payload: dict,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
 ):
-    """Simplified switch-organization: just updates driver.company_uuid."""
-    driver = db.query(Driver).filter(Driver.uuid == driver_id).first()
+    """Simplified switch-organization: company must stay the current user's company."""
+    company_uuid = require_company_uuid(current)
+    driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_id)
     if not driver:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found.")
 
-    company_uuid = payload.get("company_uuid")
-    if not company_uuid:
-         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="company_uuid required.")
-
+    raw = payload.get("company_uuid")
+    if not raw:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="company_uuid required.")
+    target = str(raw).strip()
+    if target != company_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="company_uuid must match the authenticated user's company.",
+        )
     driver.company_uuid = company_uuid
     db.add(driver)
     db.commit()
     db.refresh(driver)
-    return {"driver": driver}
-
-
-
-
-
+    return DriverResponse(driver=DriverOut.model_validate(driver))

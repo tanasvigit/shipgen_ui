@@ -6,6 +6,7 @@ type LoginResponse = {
     id?: string;
     email?: string;
     name?: string;
+    role?: string;
   };
   type?: string;
   twoFaSession?: string;

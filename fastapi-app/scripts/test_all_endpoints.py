@@ -153,7 +153,7 @@ class APITester:
         
         # Storefront
         print("\n6. Testing Storefront endpoints...")
-        self._test_storefront_customers()
+        self._test_fleetops_customers()
         self._test_storefront_products()
         self._test_storefront_carts()
         
@@ -353,9 +353,13 @@ class APITester:
         """Test device endpoints."""
         self.test_endpoint("GET", "/fleetops/v1/devices", description="List devices")
     
-    def _test_storefront_customers(self):
-        """Test storefront customer endpoints."""
-        self.test_endpoint("GET", "/storefront/v1/customers", description="List storefront customers")
+    def _test_fleetops_customers(self):
+        """Customers are standardized on fleetops contacts (type=customer)."""
+        self.test_endpoint(
+            "GET",
+            "/fleetops/v1/contacts?kind=customer&limit=10",
+            description="List customers (fleetops contacts)",
+        )
     
     def _test_storefront_products(self):
         """Test storefront product endpoints."""

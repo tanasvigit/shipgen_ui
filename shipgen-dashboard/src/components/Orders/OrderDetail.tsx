@@ -4,7 +4,7 @@ import {
   Calendar, ArrowLeft, AlertCircle, Edit
 } from 'lucide-react';
 import { driversService, UiDriver } from '../../services/driversService';
-import { ordersService, UiOrder, UiOrderLifecycleEvent } from '../../services/ordersService';
+import { ordersService, orderCustomerLabel, UiOrder, UiOrderLifecycleEvent } from '../../services/ordersService';
 import { Skeleton } from '../ui/LoadingSkeleton';
 import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
@@ -12,9 +12,15 @@ import StatusBadge from '../ui/StatusBadge';
 import EntityLink from '../common/EntityLink';
 import SelectField from '../ui/SelectField';
 import { useToast } from '../ui/ToastProvider';
+import { UserRole } from '../../types';
+import { canAssignOrDispatchOrders, getStoredUserRole } from '../../utils/roleAccess';
 
 const OrderDetail: React.FC = () => {
   const { showToast } = useToast();
+  const role = getStoredUserRole() ?? UserRole.VIEWER;
+  const isStaffAssign = canAssignOrDispatchOrders(role);
+  const isDriver = role === UserRole.DRIVER;
+  const isViewer = role === UserRole.VIEWER;
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<UiOrder | null>(null);
   const [drivers, setDrivers] = useState<UiDriver[]>([]);
@@ -41,10 +47,17 @@ const OrderDetail: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+      const r = getStoredUserRole() ?? UserRole.VIEWER;
+      const needDrivers = r !== UserRole.DRIVER;
       const [orderResponse, lifecycleResponse, driverResponse] = await Promise.all([
         ordersService.getById(id!),
         ordersService.lifecycle(id!),
-        driversService.list({ page: 1, pageSize: 100, status: 'active' }),
+        needDrivers
+          ? driversService.list({ page: 1, pageSize: 100, status: 'active' })
+          : Promise.resolve({
+              data: [] as UiDriver[],
+              pagination: { total: 0, page: 1, pageSize: 100 },
+            }),
       ]);
       setOrder(orderResponse);
       setLifecycle(lifecycleResponse);
@@ -117,8 +130,13 @@ const OrderDetail: React.FC = () => {
 
   const handleTransition = async () => {
     if (!id || !nextStatus) return;
-    if (!order?.driver_assigned_uuid || !order?.vehicle_assigned_uuid) {
+    const r = getStoredUserRole() ?? UserRole.VIEWER;
+    if (r !== UserRole.DRIVER && (!order?.driver_assigned_uuid || !order?.vehicle_assigned_uuid)) {
       showToast('Assign driver and vehicle before proceeding', 'info');
+      return;
+    }
+    if (r === UserRole.DRIVER && !order?.driver_assigned_uuid) {
+      showToast('Order is not assigned to you', 'info');
       return;
     }
     try {
@@ -233,7 +251,7 @@ const OrderDetail: React.FC = () => {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Customer</label>
-                  <p className="text-sm text-gray-900">{order.meta?.customer_name || '-'}</p>
+                  <p className="text-sm text-gray-900">{orderCustomerLabel(order)}</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -317,91 +335,105 @@ const OrderDetail: React.FC = () => {
           <div className="bg-white rounded-xl border border-gray-200 shadow-soft p-6">
             <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
             <div className="space-y-3">
-              <div>
-                <SelectField
-                  id="assign-driver"
-                  label="Assign Driver"
-                  value={assignDriverId}
-                  onChange={(e) => setAssignDriverId(e.target.value)}
-                  options={[
-                    { value: '', label: 'Auto assign (best available)' },
-                    ...drivers.map((driver) => ({
-                      value: driver.id,
-                      label: `${driver.id} (${driver.status}, online:${driver.online})`,
-                    })),
-                  ]}
-                />
-                <Button className="mt-2" fullWidth loading={assigning} onClick={handleAssign}>
-                  Assign Order
-                </Button>
-              </div>
+              {!isViewer && isStaffAssign ? (
+                <div>
+                  <SelectField
+                    id="assign-driver"
+                    label="Assign Driver"
+                    value={assignDriverId}
+                    onChange={(e) => setAssignDriverId(e.target.value)}
+                    options={[
+                      { value: '', label: 'Auto assign (best available)' },
+                      ...drivers.map((driver) => ({
+                        value: driver.id,
+                        label: `${driver.id} (${driver.status}, online:${driver.online})`,
+                      })),
+                    ]}
+                  />
+                  <Button className="mt-2" fullWidth loading={assigning} onClick={handleAssign}>
+                    Assign Order
+                  </Button>
+                </div>
+              ) : null}
 
-              <div className="border-t border-gray-100 pt-3">
-                <SelectField
-                  id="next-status"
-                  label="Transition Status"
-                  value={nextStatus}
-                  onChange={(e) => setNextStatus(e.target.value)}
-                  options={transitionCandidates(order.status).map((status) => ({
-                    value: status,
-                    label: status,
-                  }))}
-                />
-                <Button className="mt-2" fullWidth disabled={!hasAssignment} loading={transitioning} onClick={handleTransition}>
-                  Move Status
-                </Button>
-                {!hasAssignment ? (
-                  <p className="mt-2 text-xs text-amber-700">Assign driver and vehicle before proceeding</p>
-                ) : null}
-              </div>
+              {!isViewer && (isStaffAssign || isDriver) ? (
+                <div className={isStaffAssign ? 'border-t border-gray-100 pt-3' : ''}>
+                  <SelectField
+                    id="next-status"
+                    label="Transition Status"
+                    value={nextStatus}
+                    onChange={(e) => setNextStatus(e.target.value)}
+                    options={transitionCandidates(order.status).map((s) => ({
+                      value: s,
+                      label: s,
+                    }))}
+                  />
+                  <Button
+                    className="mt-2"
+                    fullWidth
+                    disabled={!isDriver && !hasAssignment}
+                    loading={transitioning}
+                    onClick={handleTransition}
+                  >
+                    Move Status
+                  </Button>
+                  {!isDriver && !hasAssignment ? (
+                    <p className="mt-2 text-xs text-amber-700">Assign driver and vehicle before proceeding</p>
+                  ) : null}
+                </div>
+              ) : null}
 
-              <div className="border-t border-gray-100 pt-3 space-y-2">
-                <p className="text-sm font-medium text-gray-800">Raise Exception</p>
-                <input
-                  className="h-10 w-full rounded-md border border-border bg-white px-3 text-sm text-neutral-900"
-                  placeholder="Exception title"
-                  value={exceptionTitle}
-                  onChange={(e) => setExceptionTitle(e.target.value)}
-                />
-                <textarea
-                  className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-neutral-900"
-                  rows={3}
-                  placeholder="Exception report"
-                  value={exceptionReport}
-                  onChange={(e) => setExceptionReport(e.target.value)}
-                />
-                <SelectField
-                  id="exception-priority"
-                  label="Priority"
-                  value={exceptionPriority}
-                  onChange={(e) => setExceptionPriority(e.target.value)}
-                  options={[
-                    { value: 'low', label: 'low' },
-                    { value: 'medium', label: 'medium' },
-                    { value: 'high', label: 'high' },
-                    { value: 'critical', label: 'critical' },
-                  ]}
-                />
-                <SelectField
-                  id="reassign-driver"
-                  label="Reassign Driver (optional)"
-                  value={reassignDriverId}
-                  onChange={(e) => setReassignDriverId(e.target.value)}
-                  options={[
-                    { value: '', label: 'No reassignment (mark delayed)' },
-                    ...drivers.map((driver) => ({
-                      value: driver.id,
-                      label: `${driver.id} (${driver.status}, online:${driver.online})`,
-                    })),
-                  ]}
-                />
-                <Button variant="danger" fullWidth loading={creatingException} onClick={handleException}>
-                  Raise Exception
-                </Button>
-              </div>
+              {!isViewer && isStaffAssign ? (
+                <div className="border-t border-gray-100 pt-3 space-y-2">
+                  <p className="text-sm font-medium text-gray-800">Raise Exception</p>
+                  <input
+                    className="h-10 w-full rounded-md border border-border bg-white px-3 text-sm text-neutral-900"
+                    placeholder="Exception title"
+                    value={exceptionTitle}
+                    onChange={(e) => setExceptionTitle(e.target.value)}
+                  />
+                  <textarea
+                    className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-neutral-900"
+                    rows={3}
+                    placeholder="Exception report"
+                    value={exceptionReport}
+                    onChange={(e) => setExceptionReport(e.target.value)}
+                  />
+                  <SelectField
+                    id="exception-priority"
+                    label="Priority"
+                    value={exceptionPriority}
+                    onChange={(e) => setExceptionPriority(e.target.value)}
+                    options={[
+                      { value: 'low', label: 'low' },
+                      { value: 'medium', label: 'medium' },
+                      { value: 'high', label: 'high' },
+                      { value: 'critical', label: 'critical' },
+                    ]}
+                  />
+                  <SelectField
+                    id="reassign-driver"
+                    label="Reassign Driver (optional)"
+                    value={reassignDriverId}
+                    onChange={(e) => setReassignDriverId(e.target.value)}
+                    options={[
+                      { value: '', label: 'No reassignment (mark delayed)' },
+                      ...drivers.map((driver) => ({
+                        value: driver.id,
+                        label: `${driver.id} (${driver.status}, online:${driver.online})`,
+                      })),
+                    ]}
+                  />
+                  <Button variant="danger" fullWidth loading={creatingException} onClick={handleException}>
+                    Raise Exception
+                  </Button>
+                </div>
+              ) : null}
 
               <Link to="/logistics/orders" className="block">
-                <Button variant="outline" fullWidth icon={Edit}>Open List To Edit</Button>
+                <Button variant="outline" fullWidth icon={Edit}>
+                  {isViewer || isDriver ? 'Back to orders' : 'Open List To Edit'}
+                </Button>
               </Link>
             </div>
           </div>

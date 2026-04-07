@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, AlertCircle, Fuel, Pencil, Trash2 } from 'lucide-react';
-import { apiClient } from '../../services/apiClient';
+import { driversService, type UiDriver } from '../../services/driversService';
 import { vehiclesService, type UiVehicle } from '../../services/vehiclesService';
 
 const VehicleDetail: React.FC = () => {
@@ -9,7 +9,7 @@ const VehicleDetail: React.FC = () => {
   const location = useLocation();
   const isEmbedded = new URLSearchParams(location.search).get('embed') === '1';
   const [vehicle, setVehicle] = useState<UiVehicle | null>(null);
-  const [driver, setDriver] = useState<any>(null);
+  const [assignedDriver, setAssignedDriver] = useState<UiDriver | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,20 +20,15 @@ const VehicleDetail: React.FC = () => {
         setLoading(true);
         const response = await vehiclesService.getById(id);
         setVehicle(response);
-        const driverUuid = (response.meta?.driver_uuid as string | undefined) ?? null;
-        if (driverUuid) {
-          const d = await apiClient.get(`/fleetops/v1/drivers/${driverUuid}`);
-          setDriver(d);
-        } else {
-          setDriver(null);
-        }
-      } catch (err: any) {
-        setError(err.message || 'Failed to load vehicle');
+        const drivers = await driversService.listForVehicle(response.id, 10);
+        setAssignedDriver(drivers[0] ?? null);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to load vehicle');
       } finally {
         setLoading(false);
       }
     };
-    loadVehicle();
+    void loadVehicle();
   }, [id]);
 
   const handleDelete = async () => {
@@ -42,8 +37,8 @@ const VehicleDetail: React.FC = () => {
     try {
       await vehiclesService.remove(id);
       window.location.hash = '#/fleet/vehicles';
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete vehicle');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to delete vehicle');
     }
   };
 
@@ -83,7 +78,8 @@ const VehicleDetail: React.FC = () => {
               Open List To Edit
             </Link>
             <button
-              onClick={handleDelete}
+              type="button"
+              onClick={() => void handleDelete()}
               className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
             >
               <Trash2 size={14} />
@@ -114,11 +110,23 @@ const VehicleDetail: React.FC = () => {
           <div><label className="text-xs text-gray-500 uppercase">status</label><p className="text-sm font-medium">{vehicle.status}</p></div>
           <div><label className="text-xs text-gray-500 uppercase">company_uuid</label><p className="text-sm font-medium break-all">{vehicle.company_uuid ?? 'null'}</p></div>
           <div><label className="text-xs text-gray-500 uppercase">vendor_uuid</label><p className="text-sm font-medium break-all">{vehicle.vendor_uuid ?? 'null'}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">driver_uuid</label><p className="text-sm font-medium break-all">{String(vehicle.meta?.driver_uuid ?? 'null')}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">meta.color</label><p className="text-sm font-medium">{vehicle.meta?.color ?? '-'}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">meta.notes</label><p className="text-sm font-medium">{vehicle.meta?.notes ?? '-'}</p></div>
+          <div><label className="text-xs text-gray-500 uppercase">latitude</label><p className="text-sm font-medium">{vehicle.latitude ?? '—'}</p></div>
+          <div><label className="text-xs text-gray-500 uppercase">longitude</label><p className="text-sm font-medium">{vehicle.longitude ?? '—'}</p></div>
+          <div><label className="text-xs text-gray-500 uppercase">meta.color</label><p className="text-sm font-medium">{vehicle.meta?.color != null ? String(vehicle.meta.color) : '-'}</p></div>
+          <div><label className="text-xs text-gray-500 uppercase">meta.notes</label><p className="text-sm font-medium">{vehicle.meta?.notes != null ? String(vehicle.meta.notes) : '-'}</p></div>
           <div><label className="text-xs text-gray-500 uppercase">updated_at</label><p className="text-sm font-medium">{vehicle.updated_at ?? '-'}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">assigned_driver</label><p className="text-sm font-medium">{driver?.driver?.uuid ?? driver?.driver?.id ?? 'none'}</p></div>
+          <div>
+            <label className="text-xs text-gray-500 uppercase">assigned_driver (driver.vehicle_uuid)</label>
+            <p className="text-sm font-medium break-all">
+              {assignedDriver ? (
+                <Link to={`/fleet/drivers/${encodeURIComponent(assignedDriver.id)}`} className="text-blue-600 hover:underline">
+                  {assignedDriver.id} — {assignedDriver.drivers_license_number || 'no license'}
+                </Link>
+              ) : (
+                'none'
+              )}
+            </p>
+          </div>
         </div>
       </div>
 

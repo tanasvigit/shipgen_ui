@@ -216,11 +216,16 @@ def leave_organization(
 @router.get("/", response_model=List[CompanyOut])
 def list_companies(
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
-    query = db.query(Company).filter(Company.deleted_at.is_(None))
+    if not current.company_uuid:
+        return []
+    query = db.query(Company).filter(
+        Company.deleted_at.is_(None),
+        Company.uuid == current.company_uuid,
+    )
     companies = query.offset(offset).limit(limit).all()
     return companies
 
@@ -229,9 +234,11 @@ def list_companies(
 def get_company(
     company_id: str,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
 ):
-    company = db.query(Company).filter(Company.uuid == company_id).first()
+    if not current.company_uuid or company_id != current.company_uuid:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found.")
+    company = db.query(Company).filter(Company.uuid == company_id, Company.deleted_at.is_(None)).first()
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found.")
     return company
@@ -265,9 +272,11 @@ def update_company(
     company_id: str,
     payload: CompanyUpdate,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
 ):
-    company = db.query(Company).filter(Company.uuid == company_id).first()
+    if not current.company_uuid or company_id != current.company_uuid:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found.")
+    company = db.query(Company).filter(Company.uuid == company_id, Company.deleted_at.is_(None)).first()
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found.")
 
@@ -285,9 +294,11 @@ def update_company(
 def delete_company(
     company_id: str,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
 ):
-    company = db.query(Company).filter(Company.uuid == company_id).first()
+    if not current.company_uuid or company_id != current.company_uuid:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found.")
+    company = db.query(Company).filter(Company.uuid == company_id, Company.deleted_at.is_(None)).first()
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found.")
 
@@ -300,9 +311,11 @@ def delete_company(
 def company_users(
     company_id: str,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    current: User = Depends(_get_current_user),
 ):
-    company = db.query(Company).filter(Company.uuid == company_id).first()
+    if not current.company_uuid or company_id != current.company_uuid:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found.")
+    company = db.query(Company).filter(Company.uuid == company_id, Company.deleted_at.is_(None)).first()
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found.")
 

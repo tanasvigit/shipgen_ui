@@ -61,7 +61,6 @@ const DriverForm: React.FC<DriverFormProps> = ({ mode, driverId, onSuccess, onCa
         await driversService.create({
           drivers_license_number: form.drivers_license_number.trim(),
           status: form.status.trim() || 'active',
-          online: Number(form.online) || 0,
         });
       }
       await onSuccess();
@@ -105,13 +104,15 @@ const DriverForm: React.FC<DriverFormProps> = ({ mode, driverId, onSuccess, onCa
               onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
             />
           </FormField>
-          <FormField label="online (0/1)" htmlFor="driver-online">
-            <Input
-              id="driver-online"
-              value={form.online}
-              onChange={(e) => setForm((p) => ({ ...p, online: e.target.value }))}
-            />
-          </FormField>
+          {mode === 'edit' ? (
+            <FormField label="online (0/1)" htmlFor="driver-online">
+              <Input
+                id="driver-online"
+                value={form.online}
+                onChange={(e) => setForm((p) => ({ ...p, online: e.target.value }))}
+              />
+            </FormField>
+          ) : null}
         </FormSection>
         <FormActions
           onCancel={onCancel}

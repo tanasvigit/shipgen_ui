@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.cache import get_redis
 from app.core.database import get_db
+from app.core.roles import effective_user_role
 from app.core.security import create_access_token, decode_access_token, verify_password
 from app.models.company import Company
 from app.models.company_user import CompanyUser
@@ -86,6 +87,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse
                     id=user.uuid or str(user.id),
                     email=user.email,
                     name=user.name,
+                    role=effective_user_role(user),
                 )
                 return LoginResponse(token=auth_token, user=login_user, type=user.type)
         except Exception:
@@ -147,6 +149,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse
         id=user.uuid or str(user.id),
         email=user.email,
         name=user.name,
+        role=effective_user_role(user),
     )
     return LoginResponse(token=token, user=login_user, type=user.type)
 

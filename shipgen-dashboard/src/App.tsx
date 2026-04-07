@@ -24,16 +24,12 @@ import {
   ChevronDown
 } from 'lucide-react';
 import AIAssistant from './components/AIAssistant';
-import MasterData from './components/MasterData';
-import LiveOperations from './components/LiveOperations';
-// Live Operations Sub-pages
-import RealTimeVehicleTracking from './components/LiveOperations/RealTimeVehicleTracking';
-import WebSocketUpdates from './components/LiveOperations/WebSocketUpdates';
-import OperationalDashboard from './components/LiveOperations/OperationalDashboard';
 // Dashboard Sub-pages
 import DashboardWrapper from './components/Dashboard/DashboardWrapper';
 import DashboardOverview from './components/Dashboard/DashboardOverview';
 // Orders Sub-pages
+import LogisticsLayout from './components/Logistics/LogisticsLayout';
+import CustomersList from './components/Logistics/CustomersList';
 import OrdersWrapper from './components/Orders/OrdersWrapper';
 import OrdersList from './components/Orders/OrdersList';
 import OrderDetail from './components/Orders/OrderDetail';
@@ -45,6 +41,7 @@ import InventoryList from './components/Warehouse/InventoryList';
 import GRNProcess from './components/Warehouse/GRNProcess';
 // Fleet Sub-pages
 import FleetWrapper from './components/Fleet/FleetWrapper';
+import FleetDashboard from './components/Fleet/FleetDashboard';
 import FleetsList from './components/Fleet/FleetsList';
 import ServiceAreasList from './components/Fleet/ServiceAreasList';
 import ZonesList from './components/Fleet/ZonesList';
@@ -107,7 +104,7 @@ import ScheduleConstraintsList from './components/Schedules/ScheduleConstraintsL
 import ScheduleMonitorList from './components/Schedules/ScheduleMonitorList';
 import ScheduleMonitorDetail from './components/Schedules/ScheduleMonitorDetail';
 import { getFilteredNavigationItems } from './constants';
-import { UserRole } from './types';
+import { normalizeUserRole, UserRole } from './types';
 import { canAccessRoute, hasAccess } from './utils/roleAccess';
 import RoleGuard from './components/RoleGuard';
 import { PageTransition } from './components/ui/PageTransition';
@@ -132,7 +129,7 @@ const DEFAULT_MOCK_USER: User = {
   id: mockAuthUser.id,
   email: mockAuthUser.email,
   name: mockAuthUser.name,
-  role: mockAuthUser.role as UserRole,
+  role: normalizeUserRole(mockAuthUser.role),
   companyId: mockAuthUser.company_id,
 };
 
@@ -300,6 +297,16 @@ const Sidebar: React.FC<{ isOpen: boolean; setIsOpen: (v: boolean) => void; onLo
                           }`}
                       >
                         Payloads
+                      </Link>
+                      <Link
+                        to="/fleet/dashboard"
+                        onClick={() => setIsOpen(false)}
+                        className={`flex items-center px-4 py-2 rounded-lg text-sm transition ${currentPath === 'fleet/dashboard'
+                          ? 'bg-blue-50 text-blue-700 font-medium'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                          }`}
+                      >
+                        Fleet dashboard
                       </Link>
                       <Link
                         to="/fleet/vehicles"
@@ -488,7 +495,14 @@ const App: React.FC = () => {
     const storedUser = localStorage.getItem('user');
     if (!storedUser) return null;
     try {
-      return JSON.parse(storedUser) as User;
+      const parsed = JSON.parse(storedUser) as { id?: string; email?: string; name?: string; role?: string; companyId?: string };
+      return {
+        id: String(parsed.id || ''),
+        email: parsed.email || '',
+        name: parsed.name || '',
+        role: normalizeUserRole(parsed.role),
+        companyId: parsed.companyId || 'default',
+      };
     } catch {
       localStorage.removeItem('user');
       return null;
@@ -594,7 +608,7 @@ const App: React.FC = () => {
                     id: user.id,
                     email: user.email,
                     name: user.name,
-                    role: UserRole.SUPER_ADMIN,
+                    role: normalizeUserRole(user.role),
                     companyId: user.companyId,
                   })
                 }
@@ -622,20 +636,24 @@ const App: React.FC = () => {
             <Route index element={<DashboardOverview />} />
           </Route>
 
-          {/* Orders */}
           <Route
-            path="/logistics/orders"
+            path="/logistics"
             element={
               <RoleGuard userRole={currentUser?.role || null} fallbackPath="/dashboard">
-                <OrdersWrapper />
+                <LogisticsLayout />
               </RoleGuard>
             }
           >
-            <Route index element={<OrdersList />} />
-            <Route path="dispatch-board" element={<DispatchBoard />} />
-            <Route path=":id" element={<OrderDetail />} />
+            <Route path="orders" element={<OrdersWrapper />}>
+              <Route index element={<OrdersList />} />
+              <Route path="dispatch-board" element={<DispatchBoard />} />
+              <Route path=":id" element={<OrderDetail />} />
+            </Route>
+            <Route path="customers" element={<CustomersList />} />
+            <Route path="customers/new" element={<Navigate to="/logistics/customers" replace />} />
+            <Route path="customers/:id/edit" element={<Navigate to="/logistics/customers" replace />} />
+            <Route index element={<Navigate to="/logistics/orders" replace />} />
           </Route>
-          <Route path="/logistics" element={<Navigate to="/logistics/orders" replace />} />
 
           {/* Fleet & Drivers */}
           <Route
@@ -646,6 +664,7 @@ const App: React.FC = () => {
               </RoleGuard>
             }
           >
+            <Route path="dashboard" element={<FleetDashboard />} />
             <Route path="fleets" element={<FleetsList />} />
             <Route path="service-areas" element={<ServiceAreasList />} />
             <Route path="zones" element={<ZonesList />} />
@@ -668,18 +687,8 @@ const App: React.FC = () => {
             <Route path="issues/:id" element={<IssueDetail />} />
             <Route path="fuel-reports" element={<FuelReportsList />} />
             <Route path="fuel-reports/:id" element={<FuelReportDetail />} />
-            <Route index element={<Navigate to="/fleet/vehicles" replace />} />
+            <Route index element={<Navigate to="/fleet/dashboard" replace />} />
           </Route>
-
-          {/* Live Operations */}
-          <Route
-            path="/live-operations"
-            element={
-              <RoleGuard userRole={currentUser?.role || null} fallbackPath="/dashboard">
-                <LiveOperations />
-              </RoleGuard>
-            }
-          />
 
           {/* Warehouse */}
           <Route
@@ -740,7 +749,18 @@ const App: React.FC = () => {
             <Route path="custom-fields" element={<CustomFieldsList />} />
             <Route path="custom-field-values" element={<CustomFieldValuesList />} />
             <Route path="companies" element={<CompaniesList />} />
-            <Route path="users" element={<UsersList />} />
+            <Route
+              path="users"
+              element={
+                <RoleGuard
+                  userRole={currentUser?.role ?? null}
+                  requiredRole={[UserRole.ADMIN]}
+                  fallbackPath="/dashboard"
+                >
+                  <UsersList />
+                </RoleGuard>
+              }
+            />
             <Route path="comments" element={<CommentsList />} />
             <Route path="profile" element={<Profile />} />
             <Route path="extensions" element={<ExtensionsList />} />
@@ -755,15 +775,7 @@ const App: React.FC = () => {
             <Route index element={<Navigate to="/analytics/reports" replace />} />
           </Route>
 
-          {/* Master Data & AI */}
-          <Route
-            path="/master-data"
-            element={
-              <RoleGuard userRole={currentUser?.role || null} fallbackPath="/dashboard">
-                <MasterData />
-              </RoleGuard>
-            }
-          />
+          {/* AI */}
           <Route
             path="/ai-assistant"
             element={
@@ -776,15 +788,15 @@ const App: React.FC = () => {
           {/* /app aliases for real app modules (for redirect from public demo & login) */}
           <Route path="/app/dashboard" element={<Navigate to="/dashboard" replace />} />
           <Route path="/app/logistics/orders/*" element={<Navigate to="/logistics/orders" replace />} />
+          <Route path="/app/logistics/customers/*" element={<Navigate to="/logistics/customers" replace />} />
           <Route path="/app/warehouse/*" element={<Navigate to="/warehouse" replace />} />
           <Route path="/app/fleet/*" element={<Navigate to="/fleet" replace />} />
           <Route path="/app/billing/*" element={<Navigate to="/billing" replace />} />
           <Route path="/app/analytics/*" element={<Navigate to="/analytics" replace />} />
 
-          {/* Live Operations Sub-pages */}
-          <Route path="/live-operations/vehicle-tracking" element={<RealTimeVehicleTracking />} />
-          <Route path="/live-operations/websocket-updates" element={<WebSocketUpdates />} />
-          <Route path="/live-operations/dashboard" element={<OperationalDashboard />} />
+          {/* Removed mock modules — keep bookmarks working */}
+          <Route path="/master-data" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/live-operations/*" element={<Navigate to="/dashboard" replace />} />
           <Route
             path="*"
             element={

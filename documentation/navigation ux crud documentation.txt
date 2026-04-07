@@ -1,0 +1,814 @@
+================================================================================
+END-TO-END UX, NAVIGATION, AND CRUD DOCUMENTATION
+ShipGen Logistics Platform (FastAPI + React Dashboard)
+================================================================================
+
+Version: 1.0
+Audience: Product owners, architects, QA, UX designers, developers, thesis/project reviewers
+Scope: Complete application-level analysis of navigation flow, UX, CRUD operations,
+       state interaction, routing, edge handling, and improvements.
+
+--------------------------------------------------------------------------------
+1. APPLICATION OVERVIEW
+--------------------------------------------------------------------------------
+
+1.1 Purpose of the Application
+- The platform is an operations console for logistics and fleet management.
+- It enables organizations to manage orders, customers, drivers, vehicles, dispatch,
+  operational analytics, billing, and admin workflows from a unified web app.
+- It combines:
+  - Internal/admin modules (`/int/v1/*` backend APIs),
+  - Fleet operations (`/fleetops/v1/*`),
+  - Supporting enterprise modules (reports, schedules, files, API logs, etc.).
+
+1.2 Target Users
+- ADMIN: full platform control, user management, destructive actions.
+- OPERATIONS_MANAGER: full operations execution, limited admin scope.
+- DISPATCHER: day-to-day logistics execution (orders, assignments, transitions).
+- DRIVER: restricted operational visibility and limited transitions.
+- VIEWER: read-only visibility for monitoring and reporting.
+
+1.3 Core Features
+- Authentication with protected routes.
+- Role-aware navigation and route guards.
+- Fleet dashboard with KPI drill-down.
+- Order lifecycle management (creation -> dispatch -> completion).
+- Customer master management (via contacts model).
+- Driver and vehicle roster management with filters and detail modals.
+- Cross-module admin tools (reports, schedules, transactions, notifications, etc.).
+
+--------------------------------------------------------------------------------
+2. NAVIGATION ARCHITECTURE
+--------------------------------------------------------------------------------
+
+2.1 Navigation Model
+- Frontend is a SPA using `HashRouter` (`/#/...` paths).
+- Main shell layout:
+  - Collapsible sidebar (`PremiumSidebar`),
+  - Top navigation bar (`TopNavbar`),
+  - Content outlet area (`<Outlet />`),
+  - Global footer.
+- Mobile and desktop sidebar behavior is responsive:
+  - Mobile: drawer/open-close interaction,
+  - Desktop: collapsible sidebar state.
+
+2.2 Main Navigation Structure
+- Primary sections:
+  - Dashboard
+  - Logistics
+  - Warehouse
+  - Fleet
+  - Billing
+  - Analytics
+  - AI Assistant (role-aware visibility)
+- Logistics and Fleet have nested sub-navigation entries.
+- Sidebar items are filtered by role using `getFilteredNavigationItems()` + RBAC map.
+
+2.3 Entry Points
+- `/login` -> authentication entry.
+- `/` -> redirects based on token presence:
+  - token exists -> `/dashboard`
+  - no token -> `/login`
+- Aliases for compatibility:
+  - `/app/*` routes redirect to current canonical routes.
+
+2.4 Page Hierarchy and Flow
+- App-level wrappers:
+  - `ProtectedRoute` verifies token.
+  - `ProtectedLayout` renders app shell.
+  - `RoleGuard` verifies role-based route access.
+- Nested section wrappers:
+  - `/logistics` -> `LogisticsLayout`
+  - `/fleet` -> `FleetWrapper`
+  - `/warehouse` -> `WarehouseWrapper`
+  - `/billing` -> `BillingWrapper`
+  - `/analytics` -> `ReportsWrapper`
+
+Flow principle:
+- Authentication gate first -> Section guard -> Route-level component.
+
+--------------------------------------------------------------------------------
+3. PAGE-LEVEL BREAKDOWN
+--------------------------------------------------------------------------------
+
+Note: The app contains many modules. The pages below are grouped into:
+- Core operational pages (high usage, full detail),
+- Extended platform pages (standardized list/detail patterns).
+
+3.1 Authentication
+- Page: Login (`/login`)
+- Purpose: authenticate user and initialize session context.
+- Access path: direct URL or automatic redirect from protected routes.
+- UI components:
+  - login form,
+  - error feedback,
+  - submit action.
+- User interactions:
+  - enter credentials,
+  - submit,
+  - on success: store session data and route to dashboard.
+
+3.2 Dashboard
+- Page: Dashboard Overview (`/dashboard`)
+- Purpose: high-level operational overview and quick access.
+- Access path: sidebar -> Dashboard.
+- UX:
+  - read-focused visualization,
+  - role-limited access for restricted users.
+
+3.3 Logistics Module
+
+3.3.1 Orders List
+- Route: `/logistics/orders`
+- Purpose: view/search/filter/manage operational orders.
+- Access path: sidebar -> Logistics -> Orders List.
+- UI components:
+  - `OrdersWrapper`,
+  - table/list area,
+  - search, filters, action controls.
+- Interactions:
+  - open order detail,
+  - create/edit/delete (role-dependent),
+  - dispatch board navigation.
+
+3.3.2 Order Detail
+- Route: `/logistics/orders/:id`
+- Purpose: single order inspection and operational actions.
+- Interactions:
+  - status transitions,
+  - assignment/dispatch actions (role-controlled),
+  - read timeline/detail information.
+
+3.3.3 Dispatch Board
+- Route: `/logistics/orders/dispatch-board`
+- Purpose: dispatch-centric action screen.
+- Access constraints:
+  - not available to DRIVER and VIEWER based on route rules.
+
+3.3.4 Customers List
+- Route: `/logistics/customers`
+- Purpose: customer master management used by order creation flow.
+- UI components:
+  - customer list table,
+  - create/edit modal forms (`CustomerForm`),
+  - delete actions.
+- Interactions:
+  - search and pagination,
+  - create/update customer records,
+  - reuse in order form selector.
+
+3.4 Fleet Module
+
+3.4.1 Fleet Dashboard
+- Route: `/fleet/dashboard`
+- Purpose: fleet KPIs + assignment visibility + drill-down.
+- UI components:
+  - KPI cards (clickable),
+  - drivers table,
+  - vehicles table.
+- Interactions:
+  - KPI click -> navigates to filtered list pages,
+  - row links to detail pages.
+
+3.4.2 Drivers List
+- Route: `/fleet/drivers`
+- Purpose: operational driver roster management.
+- Components:
+  - `StandardCrudListLayout`,
+  - `ResponsiveTable`,
+  - `DriverForm` modal,
+  - detail modal (`RouteDetailsModal`).
+- Interactions:
+  - search + filters (status/online/unassigned),
+  - full-row click opens details,
+  - edit/delete buttons stop row-click propagation.
+
+3.4.3 Driver Detail
+- Route: `/fleet/drivers/:id`
+- Purpose: complete driver profile and live fields (including lat/lng).
+
+3.4.4 Vehicles List
+- Route: `/fleet/vehicles`
+- Purpose: fleet asset management and assignment visibility.
+- Components:
+  - `StandardCrudListLayout`,
+  - `ResponsiveTable`,
+  - `VehicleForm` modal,
+  - `RouteDetailsModal`.
+- Interactions:
+  - search + status/unassigned filters,
+  - row click opens detail,
+  - edit/delete action controls.
+
+3.4.5 Vehicle Detail
+- Route: `/fleet/vehicles/:id`
+- Purpose: vehicle profile, metadata, linked driver view.
+
+3.4.6 Additional Fleet Pages
+- Routes:
+  - `/fleet/fleets`
+  - `/fleet/service-areas`
+  - `/fleet/zones`
+  - `/fleet/tracking-numbers`
+  - `/fleet/tracking-statuses`
+  - `/fleet/payloads`, `/fleet/payloads/:id`
+  - `/fleet/entities`
+  - `/fleet/contacts`, `/fleet/contacts/:id`
+  - `/fleet/places`, `/fleet/places/:id`
+  - `/fleet/vendors`, `/fleet/vendors/:id`
+  - `/fleet/issues`, `/fleet/issues/:id`
+  - `/fleet/fuel-reports`, `/fleet/fuel-reports/:id`
+- Pattern:
+  - list-first workflows with optional detail routes.
+
+3.5 Warehouse Module
+- Routes:
+  - `/warehouse/zones`
+  - `/warehouse/inventory`
+  - `/warehouse/inventory/grn`
+- Purpose: inventory and zone operations.
+
+3.6 Billing Module
+- Routes:
+  - `/billing/invoices`, `/billing/invoices/:id`
+  - `/billing/payments`
+  - `/billing/payments/record`
+- Purpose: invoice and payment operations.
+
+3.7 Analytics/Admin Module
+- Routes include reports, schedules, transactions, API logs/events, files,
+  notifications, groups, devices, activities, custom fields, companies, users, etc.
+- Special guard:
+  - `/analytics/users` is wrapped with explicit ADMIN-only role guard.
+
+3.8 AI Assistant
+- Route: `/ai-assistant`
+- Purpose: contextual assistant experience.
+- Access: role-aware via sidebar access and route guard.
+
+--------------------------------------------------------------------------------
+4. CRUD OPERATIONS FLOW (MODULE-WISE)
+--------------------------------------------------------------------------------
+
+4.1 Standard CRUD UX Pattern
+- Shared components:
+  - `StandardCrudListLayout` for common list shell,
+  - `useListWithCrud()` hook for load/reload/delete/feedback consistency,
+  - `ResponsiveTable` for desktop table + mobile card presentation.
+- Common UX sequence:
+  1) Load list
+  2) Search/filter
+  3) Create/Edit in modal or form
+  4) Delete with confirmation dialog
+  5) Reload + toast feedback
+
+4.2 Orders CRUD
+- Create:
+  - Via order form with required fields (internal ID, type, customer, schedule,
+    pickup and delivery locations).
+  - Location validation ensures address + coordinates.
+- Read:
+  - Orders list table + detail route.
+- Update:
+  - Edit mode pre-fills form from order payload.
+- Delete:
+  - Role-limited; admin-only deletion in policy.
+  - Confirm-based UX pattern.
+- Navigation flow:
+  - list -> detail -> edit/update -> list refresh.
+
+4.3 Customers CRUD
+- Create:
+  - modal form (`CustomerForm`) with name and phone required.
+- Read:
+  - customer list table and row-level interactions.
+- Update:
+  - modal edit preloads selected customer.
+- Delete:
+  - confirmation + removal + list refresh.
+- Flow relation:
+  - customers feed the order `CustomerSelector` dependency.
+
+4.4 Drivers CRUD
+- Create:
+  - modal form (`DriverForm`) requiring driver license number.
+- Read:
+  - list table, detail route/modal, filters.
+- Update:
+  - modal edit includes status and online fields.
+- Delete:
+  - confirm -> remove -> reload.
+- Additional:
+  - telemetry and online toggles exposed via service/API actions.
+
+4.5 Vehicles CRUD
+- Create:
+  - modal form (`VehicleForm`) with required make/model/type/vin/plate/status.
+- Read:
+  - list + details + assignment views.
+- Update:
+  - edit supports metadata merge (preserves baseline meta while updating color/notes).
+- Delete:
+  - confirm-based.
+- Additional:
+  - unassigned filters, track updates, driver linkage workflows.
+
+4.6 Other List-Based Modules
+- Modules like vendors, contacts, places, issues, reports, schedules, companies,
+  files, devices, activities follow similar read/list-first and action patterns.
+- Not every module has full create/update/delete exposed in UI equally; many are
+  read-centric in current implementation, with role-gated mutation actions.
+
+--------------------------------------------------------------------------------
+5. USER EXPERIENCE (UX) DESIGN ANALYSIS
+--------------------------------------------------------------------------------
+
+5.1 UX Principles Observed
+- Simplicity:
+  - standardized list shell and repeated interaction patterns reduce learning curve.
+- Consistency:
+  - repeated component structures across modules (table/filter/actions/modals).
+- Immediate feedback:
+  - inline error banners, confirmation dialogs, success toasts.
+- Progressive disclosure:
+  - detail modals/routes avoid cluttering list views.
+
+5.2 Form Handling
+- Required/optional field delineation is explicit.
+- Validation appears at form level before API call.
+- Domain-specific validation:
+  - pickup/delivery location completeness and non-equality checks in order form.
+- Error rendering:
+  - inline red alert blocks in forms.
+
+5.3 Loading, Empty, and Feedback States
+- Loading:
+  - spinners or `PageLoader` placeholders.
+- Empty states:
+  - separate “no data” vs “no match” experiences using `EmptyState`.
+- Action feedback:
+  - toasts for successful operations,
+  - inline errors for API failures.
+
+5.4 Responsiveness
+- `ResponsiveTable` automatically switches:
+  - desktop tabular view,
+  - mobile card layout.
+- Sidebar behavior adapts between mobile drawer and desktop panel.
+- Form and layout grids are responsive (`md`, `lg` breakpoints).
+
+5.5 Reusability
+- High reuse in:
+  - form containers,
+  - list layout shell,
+  - table component,
+  - modal patterns,
+  - CRUD hooks.
+- This improves maintainability and UX consistency.
+
+5.6 Performance Considerations
+- Server-side pagination parameters used in many list calls.
+- Single endpoint aggregation for fleet dashboard reduces multiple calls.
+- Lazy mock API import in dev mode minimizes runtime overhead.
+- Potential optimization area:
+  - some service pagination totals are derived from mapped length in UI, which can
+    misalign with backend total if not parsed from response (module-dependent).
+
+--------------------------------------------------------------------------------
+6. STATE AND INTERACTION FLOW
+--------------------------------------------------------------------------------
+
+6.1 Interaction Trigger -> UI Update Pattern
+- User action (click/type/submit) updates local component state.
+- Action triggers service call (via `apiClient`).
+- API response normalizes into UI model.
+- Component state updates and UI rerenders.
+- Errors are captured and surfaced through inline alerts/toasts.
+
+6.2 Component-Level State
+- Common state variables:
+  - loading, saving, error, actionError,
+  - search/filter values,
+  - selected row ID,
+  - modal open/close flags,
+  - pagination state.
+
+6.3 Data Flow Layers
+- Component -> Service -> `apiClient` -> Backend API.
+- `apiClient` responsibilities:
+  - inject bearer token,
+  - centralize error translation,
+  - redirect to login on 401.
+- Service responsibilities:
+  - endpoint orchestration,
+  - backend->UI data mapping.
+
+--------------------------------------------------------------------------------
+7. ROUTING AND PAGE TRANSITIONS
+--------------------------------------------------------------------------------
+
+7.1 Routing Approach
+- SPA with `HashRouter`.
+- Nested routes for section-level layouts.
+- Dynamic route params for detail pages (`:id` patterns).
+
+7.2 Guards and Protection
+- `ProtectedRoute`:
+  - checks token existence; redirects unauthenticated users to `/login`.
+- `RoleGuard`:
+  - checks role and route-specific permissions via `canAccessRoute`.
+  - optional strict `requiredRole` for sensitive screens.
+
+7.3 Transitions
+- On navigation:
+  - scroll resets to top (`ScrollToTopOnRouteChange`).
+- Modals and list interactions preserve context without full navigation.
+- Alias routes ensure backward-compatible links/bookmarks.
+
+--------------------------------------------------------------------------------
+8. VISUAL AND UI DESIGN SYSTEM
+--------------------------------------------------------------------------------
+
+8.1 Layout Structure
+- App shell:
+  - sidebar + topbar + content + footer.
+- Cards and bordered containers for content grouping.
+
+8.2 Typography and Visual Language
+- Utility-driven styling (Tailwind classes).
+- Hierarchy:
+  - bold page titles,
+  - muted subtitles,
+  - uppercase table headers for scannability.
+
+8.3 Color and Status Semantics
+- Primary blue for actions and focus.
+- Red for destructive/error.
+- Gray for neutral/read-only information.
+- Status badges and semantic color classes for quick recognition.
+
+8.4 Consistency
+- Repeated spacing, card radii, border treatments.
+- Shared form controls and action button styles across modules.
+
+--------------------------------------------------------------------------------
+9. EDGE CASES AND ERROR HANDLING
+--------------------------------------------------------------------------------
+
+9.1 Authentication Failures
+- 401 response triggers token cleanup and login redirect.
+
+9.2 Authorization Failures
+- RoleGuard reroutes unauthorized access to fallback path/dashboard.
+- Backend remains source of truth for denied mutations.
+
+9.3 Invalid Inputs
+- Forms block submission on missing required fields.
+- Domain validation catches invalid location payloads.
+
+9.4 Network and API Failures
+- Loader + error state pattern handles failed loads.
+- Action errors shown via banners/toasts.
+- Delete operations wrapped in try/catch and confirmation.
+
+9.5 Empty and No-Match Cases
+- Distinct UX for:
+  - true empty module,
+  - filter/search no results.
+
+--------------------------------------------------------------------------------
+10. SUGGESTIONS AND IMPROVEMENTS
+--------------------------------------------------------------------------------
+
+10.1 UX Improvements
+- Add skeleton loaders for perceived speed.
+- Add unsaved-changes prompt for forms with large payloads.
+- Add keyboard shortcuts for power users (new order, open filters, save form).
+- Add contextual helper text near advanced fields (meta/options).
+
+10.2 Navigation Optimizations
+- Introduce breadcrumb trail for deep detail routes.
+- Add global command palette for cross-module quick navigation.
+- Standardize sub-navigation patterns (all modules) like Fleet/Logistics.
+
+10.3 CRUD Optimizations
+- Standardize backend pagination response parsing across all services to use true
+  `total` values from API consistently.
+- Add optimistic UI for low-risk updates (status toggles).
+- Add batch actions where business-safe (bulk archive, bulk assign candidates).
+
+10.4 Accessibility Improvements
+- Strengthen focus ring consistency on all interactive controls.
+- Ensure ARIA labels on all icon-only buttons and modal close actions.
+- Verify color contrast on status badges for WCAG AA.
+
+10.5 Performance Improvements
+- Virtualize very large tables.
+- Memoize expensive row renderers for heavy list pages.
+- Cache stable reference data (e.g., static dropdown sources).
+
+10.6 Product/Flow Enhancements
+- Add explicit workflow ribbons (Created -> Assigned -> Dispatched ...).
+- Add decision support hints on KPI cards (why this number changed).
+- Provide dedicated operations timeline page aggregating lifecycle events.
+
+--------------------------------------------------------------------------------
+11. CONCLUSION
+--------------------------------------------------------------------------------
+
+The application demonstrates a mature operational dashboard architecture with:
+- clear navigation hierarchy,
+- strong route and role protection,
+- reusable CRUD UX foundations,
+- robust fleet/logistics business workflows.
+
+The platform is well-positioned for enterprise evolution. The highest-impact
+next steps are:
+1) pagination and data consistency hardening across all modules,
+2) deeper accessibility/performance tuning,
+3) richer workflow visualization and guided operations UX.
+
+--------------------------------------------------------------------------------
+END OF DOCUMENT
+--------------------------------------------------------------------------------
+
+================================================================================
+12. UX BEHAVIORS ADDED FOR COMPLETENESS (DETAILED ADDENDUM)
+================================================================================
+
+This section captures critical UX behaviors implemented in code that were not
+fully explicit in the initial version of this document.
+
+--------------------------------------------------------------------------------
+12.1 Runtime UX Modes (Feature-Flag Driven Experience)
+--------------------------------------------------------------------------------
+
+The application has operationally different UX modes controlled by Vite flags.
+
+A) Normal authenticated mode (default production behavior)
+- `VITE_DISABLE_AUTH=false`
+- Full authentication and role-guard flow active.
+- User must log in and can only access routes allowed by role.
+
+B) Auth bypass mode (local/demo only)
+- `VITE_DISABLE_AUTH=true`
+- Login route redirects directly to dashboard.
+- Route/role restrictions are bypassed by guard logic.
+- A default mock user is used for rendering shell and navigation.
+- UX implication:
+  - Excellent for local UI development demos,
+  - Dangerous for public deployment if accidentally enabled.
+
+C) Mock API mode (frontend simulation mode)
+- `VITE_USE_MOCK_API=true`
+- Most service calls can be fulfilled by local mock API implementation.
+- Auth endpoints and selected always-real endpoints can still hit real backend.
+- UX implication:
+  - Allows product demos without full backend readiness,
+  - Can create behavior mismatch if mixed real+mock responses are not explained.
+
+Documentation recommendation:
+- Include a dedicated “Environment UX Matrix” table in release documentation:
+  - mode, auth behavior, data source, intended audience, deployment warning.
+
+--------------------------------------------------------------------------------
+12.2 Embedded Mode UX (`?embed=1`)
+--------------------------------------------------------------------------------
+
+The application supports an embedded viewing mode via URL query:
+- if `embed=1` exists in query params, protected layout switches to minimal shell.
+
+Embedded mode behavior:
+- No sidebar navigation.
+- No top navbar.
+- No global footer.
+- Content renders in a clean single-column host-friendly container.
+
+Use cases:
+- embedding order detail or operational widgets in external portals/iframes.
+- partner/internal tools that need module content without full app chrome.
+
+UX impact:
+- reduced cognitive load and less visual clutter in host systems.
+- navigation responsibility may shift to host container.
+
+Documentation addition:
+- Add “Layout Variants” section:
+  - full shell mode,
+  - embedded mode,
+  - expected user affordances per mode.
+
+--------------------------------------------------------------------------------
+12.3 Responsive Shell Interaction Details
+--------------------------------------------------------------------------------
+
+Sidebar interaction differs by viewport:
+
+Desktop (>= large breakpoint):
+- Sidebar persists on screen.
+- Topbar toggle can collapse/expand sidebar width.
+- Navigation remains always available without overlay.
+
+Mobile:
+- Sidebar opens as drawer overlay.
+- Backdrop click closes drawer.
+- Prevents accidental interaction with underlying page.
+
+Topbar behavior:
+- Contains utility actions (notifications/settings/logout trigger context).
+- In mobile, topbar toggle opens drawer instead of collapsing persistent sidebar.
+
+UX rationale:
+- preserves primary navigation discoverability on desktop,
+- optimizes content space and touch flow on smaller devices.
+
+--------------------------------------------------------------------------------
+12.4 Route Guard UX and Fallback Paths (Exact Behavior)
+--------------------------------------------------------------------------------
+
+There are two guard layers with distinct user outcomes:
+
+Layer 1: Authentication guard (`ProtectedRoute`)
+- If token missing:
+  - user is redirected to `/login`.
+- If token exists:
+  - user can enter protected shell routes.
+
+Layer 2: Authorization guard (`RoleGuard` + `canAccessRoute`)
+- If route is disallowed for user role:
+  - user is redirected to fallback path (commonly `/dashboard`).
+- If route requires explicit role list (e.g., users admin):
+  - non-matching roles are redirected even if section access exists.
+
+Important route-rule examples:
+- `/analytics/users` -> ADMIN only.
+- `/logistics/customers` -> DRIVER denied.
+- `/logistics/orders/dispatch-board` -> DRIVER and VIEWER denied.
+- create/edit style path fragments blocked for read-only/limited roles.
+
+UX implication:
+- users experience controlled redirection rather than hard error pages.
+- dashboard acts as safe fallback landing page.
+
+--------------------------------------------------------------------------------
+12.5 Toast Feedback System (Micro-Interaction Spec)
+--------------------------------------------------------------------------------
+
+Toast system behavior:
+- Non-blocking transient feedback for success/error/info.
+- Appears top-right fixed stack.
+- Auto-dismiss timeout: approximately 2500 ms.
+- Multiple toasts can queue/stack visually.
+
+Usage pattern:
+- CRUD success: “Deleted”, “Saved”, etc.
+- Quick failure notices where inline form error is not primary surface.
+
+UX guideline:
+- Use toasts for operation-level feedback after actions.
+- Use inline form errors for input correction guidance.
+- Avoid overloading users with long-lived toasts for simple actions.
+
+--------------------------------------------------------------------------------
+12.6 Advanced Location Input UX Architecture
+--------------------------------------------------------------------------------
+
+`LocationInput` is a high-complexity UX component with multi-modal interaction.
+
+Supported interaction modes:
+1) Search mode
+   - Typeahead search with suggestion list.
+   - Uses Google Places if API key/script available.
+   - Falls back to OpenStreetMap Nominatim search if Google is unavailable.
+   - Debounced query behavior to reduce API chatter.
+
+2) Map mode
+   - User can pick location coordinates via map interaction.
+   - Reverse geocoding resolves coordinates to human-readable address.
+
+3) Manual mode
+   - User enters address parts manually.
+   - Geocoding attempts to fetch coordinates from entered address.
+   - If geocode fails, retains address with explicit error guidance.
+
+Validation behavior:
+- A location is considered valid only if:
+  - address exists,
+  - latitude exists,
+  - longitude exists.
+- Form submit depends on validity from both pickup and delivery fields.
+
+Failure UX handling:
+- Could not resolve coordinates -> explicit actionable message.
+- Could not fetch place details -> prompt to retry/select another suggestion.
+- Reverse geocode failure -> coordinate kept; user informed to retry.
+
+Performance/stability UX notes:
+- Debounced lookup reduces jitter and perceived lag.
+- Suggestion requests are tokenized/ignored when stale to avoid race-condition flicker.
+- Validity callback loop is prevented using ref-based callback tracking to avoid
+  React maximum depth render loops.
+
+--------------------------------------------------------------------------------
+12.7 Form Interaction Reliability and Loop Prevention
+--------------------------------------------------------------------------------
+
+The location validity callback architecture includes anti-loop safeguards:
+- validity is derived from value fields (address/lat/lng),
+- parent callback reference stored in ref,
+- repeated identical validity states are not re-emitted.
+
+UX impact:
+- avoids “form flicker” and lockups from repeated parent-child state ping-pong.
+- improves reliability in dense forms with asynchronous location workflows.
+
+--------------------------------------------------------------------------------
+12.8 Search, Debounce, and Async UX Behavior
+--------------------------------------------------------------------------------
+
+Search behavior is not only static filtering; it includes async integration:
+- suggestion fetch waits for minimum query length and debounce interval.
+- late responses are discarded if a newer query exists.
+- loading indicators communicate active search/lookup state.
+
+UX benefits:
+- fewer network spikes,
+- smoother interaction for fast typers,
+- reduced “wrong suggestions” race-condition issues.
+
+--------------------------------------------------------------------------------
+12.9 Error Surface Strategy (Layered UX)
+--------------------------------------------------------------------------------
+
+The codebase uses layered error surfacing:
+
+1) Inline form error blocks
+- best for validation and field-correction tasks.
+
+2) Page/list error state
+- used when initial load fails.
+- may show structured fallback empty/error container.
+
+3) Toast notifications
+- lightweight operation feedback for success or non-blocking error.
+
+4) Redirect fallback
+- for auth/permission failures where remaining on page is unsafe or misleading.
+
+Why this matters:
+- each error type is shown in the most context-appropriate UI surface.
+
+--------------------------------------------------------------------------------
+12.10 Accessibility-Specific Additions for Documentation
+--------------------------------------------------------------------------------
+
+Already present patterns:
+- many controls include aria-label usage.
+- semantic button usage for actions.
+
+Must document and verify:
+- icon-only buttons must always keep explicit accessible labels.
+- keyboard focus path in modal open/close flows.
+- color-only status indicators should have text labels (already common in tables).
+- mobile card/table equivalents should preserve semantic clarity.
+
+--------------------------------------------------------------------------------
+12.11 Pagination UX Integrity Note
+--------------------------------------------------------------------------------
+
+Observed UX risk:
+- some modules derive pagination total from current mapped rows instead of backend
+  total metadata if parser is inconsistent.
+
+Impact:
+- page count may appear inaccurate in some list contexts.
+
+Documentation action:
+- declare canonical standard:
+  - always use backend `total` where available,
+  - fallback strategy only when endpoint lacks total.
+
+--------------------------------------------------------------------------------
+12.12 Recommended Appendix Additions (for thesis/final documentation packs)
+--------------------------------------------------------------------------------
+
+To make this truly final-project complete, add these appendices:
+
+Appendix A: Role-to-Route matrix
+- exact allowed/denied routes per role.
+
+Appendix B: UX state matrix per module
+- loading state, empty state, no-match state, error state, success state.
+
+Appendix C: Form validation catalog
+- each form, required fields, sync/async validations, error messages.
+
+Appendix D: Interaction timing catalog
+- debounce timings, toast timeout, retry behavior recommendations.
+
+Appendix E: Runtime mode matrix
+- normal/auth mode vs disableAuth vs mock mode vs embed mode.
+
+--------------------------------------------------------------------------------
+END OF ADDENDUM
+--------------------------------------------------------------------------------

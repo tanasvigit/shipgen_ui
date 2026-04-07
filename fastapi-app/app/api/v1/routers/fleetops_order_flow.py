@@ -6,7 +6,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.routers.auth import _get_current_user
+from app.api.v1.routers.fleetops_orders import _driver_uuid_for_user, _get_scoped_order, _order_response
 from app.core.database import get_db
+from app.core.roles import (
+    ADMIN,
+    DISPATCHER,
+    DRIVER,
+    OPERATIONS_MANAGER,
+    VIEWER,
+    effective_user_role,
+    require_roles,
+)
 from app.models.driver import Driver
 from app.models.issue import Issue
 from app.models.notification import Notification
@@ -76,21 +86,6 @@ def _event(
     )
 
 
-def _get_order(db: Session, current: User, order_id: str) -> Order:
-    order = (
-        db.query(Order)
-        .filter(
-            Order.company_uuid == current.company_uuid,
-            Order.deleted_at.is_(None),
-            (Order.uuid == order_id) | (Order.public_id == order_id),
-        )
-        .first()
-    )
-    if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found.")
-    return order
-
-
 def _validate_transition(from_status: str | None, to_status: str) -> None:
     if to_status in TERMINAL_STATUSES | SPECIAL_STATUSES:
         return
@@ -110,6 +105,30 @@ def _validate_transition(from_status: str | None, to_status: str) -> None:
     to_idx = LIFECYCLE_ORDER.index(to_status)
     if to_idx < from_idx:
         raise HTTPException(status_code=409, detail=f"Backward transition not allowed: {from_status} -> {to_status}")
+
+
+def _validate_driver_transition(order: Order, current: User, db: Session, from_status: str, to_status: str) -> None:
+    if to_status in TERMINAL_STATUSES | SPECIAL_STATUSES:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    du = _driver_uuid_for_user(db, current)
+    if not du or order.driver_assigned_uuid != du:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    if to_status not in LIFECYCLE_ORDER:
+        raise HTTPException(status_code=400, detail=f"Unsupported status transition target: {to_status}")
+    fs = from_status
+    if fs in TERMINAL_STATUSES:
+        raise HTTPException(status_code=409, detail=f"Cannot transition from terminal status: {from_status}")
+    if fs in SPECIAL_STATUSES:
+        fs = "assigned"
+    if fs not in LIFECYCLE_ORDER:
+        fs = "created"
+    from_idx = LIFECYCLE_ORDER.index(fs)
+    to_idx = LIFECYCLE_ORDER.index(to_status)
+    if to_idx != from_idx + 1:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Drivers may only advance the order by one lifecycle step.",
+        )
 
 
 def _pick_driver(db: Session, current: User, req: AssignOrderRequest) -> Driver:
@@ -133,7 +152,7 @@ def _pick_driver(db: Session, current: User, req: AssignOrderRequest) -> Driver:
         .filter(
             Driver.company_uuid == current.company_uuid,
             Driver.deleted_at.is_(None),
-            Driver.status.in_(["active", "available"]),
+            Driver.status == "active",
         )
         .order_by(Driver.online.desc(), Driver.updated_at.desc().nullslast())
         .first()
@@ -189,9 +208,9 @@ def assign_order(
     order_id: str,
     payload: AssignOrderRequest,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
-    order = _get_order(db, current, order_id)
+    order = _get_scoped_order(db, current, order_id)
     from_status = order.status or "created"
 
     if from_status in TERMINAL_STATUSES:
@@ -243,7 +262,7 @@ def assign_order(
     db.add(order)
     db.commit()
     db.refresh(order)
-    return {"order": order}
+    return _order_response(db, current, order)
 
 
 @router.post("/{order_id}/transition", response_model=OrderResponse)
@@ -253,10 +272,18 @@ def transition_order(
     db: Session = Depends(get_db),
     current: User = Depends(_get_current_user),
 ):
-    order = _get_order(db, current, order_id)
+    order = _get_scoped_order(db, current, order_id)
     from_status = order.status or "created"
     to_status = payload.to_status.strip().lower()
-    _validate_transition(from_status, to_status)
+    role = effective_user_role(current)
+    if role == VIEWER:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    if role == DRIVER:
+        _validate_driver_transition(order, current, db, from_status, to_status)
+    elif role not in {ADMIN, OPERATIONS_MANAGER, DISPATCHER}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    else:
+        _validate_transition(from_status, to_status)
     if to_status in ASSIGNMENT_REQUIRED_STATUSES and (
         not order.driver_assigned_uuid or not order.vehicle_assigned_uuid
     ):
@@ -289,7 +316,7 @@ def transition_order(
     db.add(order)
     db.commit()
     db.refresh(order)
-    return {"order": order}
+    return _order_response(db, current, order)
 
 
 @router.post("/{order_id}/exceptions", response_model=OrderResponse)
@@ -297,9 +324,9 @@ def create_order_exception(
     order_id: str,
     payload: CreateExceptionRequest,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
-    order = _get_order(db, current, order_id)
+    order = _get_scoped_order(db, current, order_id)
     from_status = order.status or "created"
 
     issue = Issue(
@@ -347,7 +374,7 @@ def create_order_exception(
     db.add(order)
     db.commit()
     db.refresh(order)
-    return {"order": order}
+    return _order_response(db, current, order)
 
 
 @router.get("/{order_id}/lifecycle", response_model=list[OrderEventOut])
@@ -356,7 +383,7 @@ def get_order_lifecycle(
     db: Session = Depends(get_db),
     current: User = Depends(_get_current_user),
 ):
-    order = _get_order(db, current, order_id)
+    order = _get_scoped_order(db, current, order_id)
     rows = (
         db.query(OrderEvent)
         .filter(OrderEvent.company_uuid == current.company_uuid, OrderEvent.order_uuid == order.uuid)

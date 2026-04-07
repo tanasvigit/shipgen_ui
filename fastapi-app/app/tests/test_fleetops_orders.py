@@ -14,7 +14,8 @@ class TestOrderList:
         response = client.get("/fleetops/v1/orders", headers=auth_headers)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert isinstance(data, list)
+        assert isinstance(data, dict) and "orders" in data
+        assert isinstance(data["orders"], list)
 
     def test_list_orders_no_auth(self, client):
         """Test listing orders without authentication."""
@@ -31,7 +32,7 @@ class TestOrderGet:
         response = client.get(f"/fleetops/v1/orders/{test_order.public_id}", headers=auth_headers)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["public_id"] == test_order.public_id
+        assert data["order"]["public_id"] == test_order.public_id
 
     def test_get_order_not_found(self, client, auth_headers):
         """Test getting non-existent order."""
@@ -43,39 +44,53 @@ class TestOrderGet:
 class TestOrderCreate:
     """Test order creation endpoint."""
 
-    def test_create_order_success(self, client, auth_headers, test_company):
+    def test_create_order_success(self, client, auth_headers, test_customer_contact):
         """Test creating a new order."""
         response = client.post(
             "/fleetops/v1/orders",
             headers=auth_headers,
             json={
+                "type": "pickup",
+                "customer_uuid": test_customer_contact.uuid,
                 "internal_id": "ORD-TEST-001",
-                "status": "pending",
             },
         )
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
-        assert data["internal_id"] == "ORD-TEST-001"
-        assert "public_id" in data
-        assert "uuid" in data
+        assert data["order"]["internal_id"] == "ORD-TEST-001"
+        assert "public_id" in data["order"]
+        assert "uuid" in data["order"]
 
 
 @pytest.mark.fleetops
 class TestOrderUpdate:
     """Test order update endpoint."""
 
-    def test_update_order_success(self, client, auth_headers, test_order):
+    def test_update_order_success(self, client, auth_headers, test_order, test_customer_contact):
         """Test updating an order."""
         response = client.put(
             f"/fleetops/v1/orders/{test_order.public_id}",
             headers=auth_headers,
             json={
+                "customer_uuid": test_customer_contact.uuid,
                 "status": "dispatched",
             },
         )
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["status"] == "dispatched"
+        assert data["order"]["status"] == "dispatched"
+
+    def test_update_order_notes_only_without_customer_in_body(self, client, auth_headers, test_order):
+        """Partial update: omit customer_uuid, do not clear existing link."""
+        response = client.patch(
+            f"/fleetops/v1/orders/{test_order.public_id}",
+            headers=auth_headers,
+            json={"notes": "Updated without touching customer"},
+        )
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["order"]["notes"] == "Updated without touching customer"
+        assert data["order"]["customer_uuid"] == test_order.customer_uuid
 
 
 @pytest.mark.fleetops

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.api.v1.routers.auth import _get_current_user
+from app.core.roles import effective_user_role
 from app.models.user import User
 from app.schemas.auth import MeUser
 
@@ -31,5 +32,6 @@ def current_user_me(
         email=current.email,
         name=current.name,
         type=current.type,
+        role=effective_user_role(current),
     )
 

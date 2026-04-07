@@ -1,6 +1,6 @@
 from typing import List, Optional
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -67,13 +67,15 @@ def create_customer(
 ):
     customer = Contact()
     customer.uuid = str(uuid.uuid4())
+    customer.public_id = f"contact_{uuid.uuid4().hex[:12]}"
     customer.company_uuid = current.company_uuid
-    customer.created_by_uuid = current.uuid
     customer.name = payload.name
     customer.email = payload.email
     customer.phone = payload.phone
     customer.type = payload.type
-    
+    customer.created_at = datetime.now(timezone.utc)
+    customer.updated_at = datetime.now(timezone.utc)
+
     db.add(customer)
     db.commit()
     db.refresh(customer)

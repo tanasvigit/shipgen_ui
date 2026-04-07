@@ -3,15 +3,26 @@ import { Lock, Mail, ChevronRight, ShieldCheck, Eye, EyeOff } from 'lucide-react
 import Footer from './Footer';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { login } from '../services/auth';
+import { normalizeUserRole, type UserRole } from '../types';
 import { PH } from '../constants/formPlaceholders';
 
 interface LoginProps {
-  onLogin: (user: { id: string; email: string; name: string; role: string; companyId: string }) => void;
+  onLogin: (user: { id: string; email: string; name: string; role: UserRole; companyId: string }) => void;
 }
 
+/** Matches `fastapi-app/scripts/seed_rbac_demo_users.py` — same password for all. */
+const DEMO_PASSWORD = 'RbacDemo123';
+const DEMO_ACCOUNTS: { role: string; email: string }[] = [
+  { role: 'ADMIN', email: 'admin@demo.local' },
+  { role: 'OPERATIONS_MANAGER', email: 'operations@demo.local' },
+  { role: 'DISPATCHER', email: 'dispatcher@demo.local' },
+  { role: 'DRIVER', email: 'driver@demo.local' },
+  { role: 'VIEWER', email: 'viewer@demo.local' },
+];
+
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const [identity, setIdentity] = useState('admin@techliv.net');
-  const [password, setPassword] = useState('admin123');
+  const [identity, setIdentity] = useState('admin@demo.local');
+  const [password, setPassword] = useState(DEMO_PASSWORD);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +57,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         id: String(rawUser.id || 'me'),
         email: rawUser.email || identity,
         name: rawUser.name || identity,
-        role: 'SUPER_ADMIN',
+        role: normalizeUserRole(rawUser.role),
         companyId: 'default',
       };
       localStorage.setItem('user', JSON.stringify(appUser));
@@ -78,11 +89,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         {/* Card */}
         <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-8">
-          <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 p-4">
-            <h3 className="text-sm font-bold text-blue-900">Demo Credentials</h3>
-            <p className="text-sm text-blue-800 mt-1">admin@techliv.net / admin123</p>
-            <p className="text-sm text-blue-800">user@techliv.net / user123</p>
-          </div>
           <div className="space-y-6">
             {/* Email */}
             <div>
@@ -155,6 +161,21 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 />
               </button>
             </div>
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-gray-100">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-3">
+              Demo accounts · password <span className="font-mono text-gray-600 normal-case">{DEMO_PASSWORD}</span>
+            </p>
+            <ul className="space-y-1.5 text-xs text-gray-600">
+              {DEMO_ACCOUNTS.map(({ role, email }) => (
+                <li key={email} className="flex flex-wrap gap-x-2 gap-y-0.5">
+                  <span className="font-medium text-gray-700 min-w-[8.5rem]">{role}</span>
+                  <span className="font-mono text-gray-500">{email}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[11px] text-gray-400 mt-4">Also: admin@techliv.net / admin123</p>
           </div>
 
           {/* Footer */}

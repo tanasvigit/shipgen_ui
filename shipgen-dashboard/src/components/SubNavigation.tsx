@@ -6,6 +6,8 @@ interface SubNavItem {
   path: string;
   label: string;
   exact?: boolean;
+  /** When set, overrides default `exact` / `startsWith` matching. */
+  match?: (pathname: string) => boolean;
 }
 
 interface SubNavigationProps {
@@ -21,9 +23,11 @@ const SubNavigation: React.FC<SubNavigationProps> = ({ items, basePath }) => {
     <div className="mb-6 bg-white rounded-xl border border-gray-200 p-2">
       <div className="flex items-center space-x-1 overflow-x-auto">
         {items.map((item, idx) => {
-          const isActive = item.exact
-            ? currentPath === item.path
-            : currentPath.startsWith(item.path);
+          const isActive = item.match
+            ? item.match(currentPath)
+            : item.exact
+              ? currentPath === item.path
+              : currentPath.startsWith(item.path);
           
           return (
             <React.Fragment key={item.path}>

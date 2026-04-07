@@ -1,5 +1,6 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { User, Eye, Edit, Trash2 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { driversService, type UiDriver } from '../../services/driversService';
 import { ResponsiveTable } from '../ui/ResponsiveTable';
 import useListWithCrud from '../../hooks/useListWithCrud';
@@ -9,39 +10,58 @@ import Modal from '../common/Modal';
 import RouteDetailsModal from '../common/RouteDetailsModal';
 import DriverForm from './forms/DriverForm';
 
+const PAGE_SIZE = 20;
+
 const DriversList: React.FC = () => {
+  const location = useLocation();
+  const initialParams = new URLSearchParams(location.search);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(initialParams.get('status') ?? '');
+  const [onlineFilter, setOnlineFilter] = useState<'all' | '1'>(
+    initialParams.get('online') === '1' ? '1' : 'all'
+  );
+  const [unassignedFilter, setUnassignedFilter] = useState(initialParams.get('unassigned') === 'true');
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [listTotal, setListTotal] = useState(0);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    setStatusFilter(params.get('status') ?? '');
+    setOnlineFilter(params.get('online') === '1' ? '1' : 'all');
+    setUnassignedFilter(params.get('unassigned') === 'true');
+    setPage(1);
+  }, [location.search]);
+
   const load = useCallback(async () => {
     const response = await driversService.list({
       page,
-      pageSize: 20,
+      pageSize: PAGE_SIZE,
       status: statusFilter || undefined,
+      online: onlineFilter === '1' ? 1 : undefined,
+      unassigned: unassignedFilter || undefined,
     });
-    setTotalPages(Math.max(1, Math.ceil((response.pagination?.total || 0) / 20)));
+    setListTotal(response.pagination?.total ?? 0);
     return response.data;
-  }, [page, statusFilter]);
+  }, [page, statusFilter, onlineFilter, unassignedFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
 
   const { rows, loading, error, actionError, deleteWithConfirm, reload } = useListWithCrud<UiDriver>(load, [load]);
 
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     return rows.filter((d) => {
-      const statusOk = statusFilter ? d.status === statusFilter : true;
       const searchOk =
         q.length === 0 ||
         d.id.toLowerCase().includes(q) ||
         d.drivers_license_number.toLowerCase().includes(q);
-      return statusOk && searchOk;
+      return searchOk;
     });
-  }, [rows, searchTerm, statusFilter]);
+  }, [rows, searchTerm]);
 
   return (
     <>
@@ -51,7 +71,7 @@ const DriversList: React.FC = () => {
         createOnClick={() => setIsCreateOpen(true)}
         createLabel="New Driver"
         filters={
-          <div className="max-w-xs">
+          <div className="grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-3">
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -64,6 +84,29 @@ const DriversList: React.FC = () => {
               <option value="active">active</option>
               <option value="inactive">inactive</option>
             </select>
+            <select
+              value={onlineFilter}
+              onChange={(e) => {
+                const v = e.target.value === '1' ? '1' : 'all';
+                setOnlineFilter(v);
+                setPage(1);
+              }}
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All connectivity</option>
+              <option value="1">online</option>
+            </select>
+            <label className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={unassignedFilter}
+                onChange={(e) => {
+                  setUnassignedFilter(e.target.checked);
+                  setPage(1);
+                }}
+              />
+              Unassigned only
+            </label>
           </div>
         }
         searchPlaceholder={PH.searchDrivers}
@@ -95,6 +138,8 @@ const DriversList: React.FC = () => {
             onClick={() => {
               setSearchTerm('');
               setStatusFilter('');
+              setOnlineFilter('all');
+              setUnassignedFilter(false);
             }}
             className="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
           >
@@ -106,6 +151,10 @@ const DriversList: React.FC = () => {
         <ResponsiveTable
           data={filtered}
           keyExtractor={(driver) => driver.id}
+          onRowClick={(driver) => {
+            setSelectedId(driver.id);
+            setIsDetailsOpen(true);
+          }}
           columns={[
             {
               key: 'driver_id',
@@ -141,7 +190,8 @@ const DriversList: React.FC = () => {
                 <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setSelectedId(driver.id);
                       setIsDetailsOpen(true);
                     }}
@@ -151,7 +201,8 @@ const DriversList: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setSelectedId(driver.id);
                       setIsEditOpen(true);
                     }}
@@ -162,12 +213,13 @@ const DriversList: React.FC = () => {
                   <button
                     type="button"
                     data-testid={`driver-delete-${driver.id}`}
-                    onClick={() =>
+                    onClick={(e) => {
+                      e.stopPropagation();
                       void deleteWithConfirm(driver.id, (id) => driversService.remove(id), {
                         confirmMessage: 'Delete this driver?',
                         successMessage: 'Driver deleted',
-                      })
-                    }
+                      });
+                    }}
                     className="rounded-lg p-2 text-red-600 transition hover:bg-red-50"
                   >
                     <Trash2 size={16} />
@@ -216,7 +268,7 @@ const DriversList: React.FC = () => {
         editLabel="Edit Driver"
       />
 
-      {totalPages > 1 && (
+      {listTotal > PAGE_SIZE && (
         <div className="flex items-center justify-center space-x-2">
           <button
             type="button"

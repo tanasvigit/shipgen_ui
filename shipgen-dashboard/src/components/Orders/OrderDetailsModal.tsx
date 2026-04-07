@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, Calendar, RefreshCw } from 'lucide-react';
 import Modal from '../common/Modal';
-import { ordersService, UiOrder, UiOrderLifecycleEvent } from '../../services/ordersService';
+import { ordersService, orderCustomerLabel, UiOrder, UiOrderLifecycleEvent } from '../../services/ordersService';
 import { Button } from '../ui/Button';
 import StatusBadge from '../ui/StatusBadge';
 import EntityLink from '../common/EntityLink';
@@ -90,7 +90,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, orderId, 
             </div>
             <div>
               <label className="text-xs uppercase text-gray-500">Customer</label>
-              <p className="text-sm">{order.meta?.customer_name || '-'}</p>
+              <p className="text-sm">{orderCustomerLabel(order)}</p>
             </div>
             <div>
               <label className="text-xs uppercase text-gray-500">Priority</label>

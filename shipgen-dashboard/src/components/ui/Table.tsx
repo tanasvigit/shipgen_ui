@@ -31,7 +31,8 @@ interface TablePaginationState {
 
 interface TableProps<T> {
   columns: TableColumn<T>[];
-  data: T[];
+  /** Row data; if omitted at runtime, renders as empty. */
+  data?: T[];
   rowKey: (row: T) => string;
   loading?: boolean;
   emptyState?: TableEmptyState;
@@ -62,6 +63,8 @@ function Table<T>({
   onRowClick,
   fillWidth = false,
 }: TableProps<T>) {
+  const rows = data ?? [];
+
   if (loading) {
     return (
       <div className="p-6">
@@ -70,7 +73,7 @@ function Table<T>({
     );
   }
 
-  if (!data.length) {
+  if (!rows.length) {
     if (!emptyState) {
       return null;
     }
@@ -104,7 +107,7 @@ function Table<T>({
             </tr>
           </thead>
           <tbody className="divide-y divide-border-subtle">
-            {data.map((row, index) => (
+            {rows.map((row, index) => (
               <tr
                 key={rowKey(row)}
                 className={cn(

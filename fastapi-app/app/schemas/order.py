@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class OrderBase(BaseModel):
@@ -11,6 +11,9 @@ class OrderBase(BaseModel):
     internal_id: Optional[str] = None
     customer_uuid: Optional[str] = None
     customer_type: Optional[str] = None
+    customer_display_name: Optional[str] = Field(
+        default=None, description="Resolved from Contact in API responses; not persisted on Order row."
+    )
     driver_assigned_uuid: Optional[str] = None
     vehicle_assigned_uuid: Optional[str] = None
     meta: Optional[dict[str, Any]] = None
@@ -36,6 +39,7 @@ class OrderBase(BaseModel):
 
 class OrderCreate(BaseModel):
     type: str
+    customer_uuid: str
     internal_id: Optional[str] = None
     notes: Optional[str] = None
     scheduled_at: Optional[datetime] = None
@@ -44,10 +48,14 @@ class OrderCreate(BaseModel):
 
 
 class OrderUpdate(BaseModel):
+    """Partial update. When `customer_uuid` is sent (including explicit null), it is validated; omit the field to leave the link unchanged."""
+
+    customer_uuid: Optional[str] = None
     internal_id: Optional[str] = None
     notes: Optional[str] = None
     scheduled_at: Optional[datetime] = None
     status: Optional[str] = None
+    type: Optional[str] = None
     meta: Optional[dict[str, Any]] = None
     options: Optional[dict[str, Any]] = None
 

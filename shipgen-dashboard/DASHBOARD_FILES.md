@@ -13,10 +13,8 @@
 - `components/Fleet/*`
 - `components/Billing/*`
 - `components/Reports/*`
-- `components/LiveOperations/*` (authenticated version)
 - `components/Analytics.tsx`
 - `components/AIAssistant.tsx` (dashboard AI module)
-- `components/MasterData.tsx`
 - `components/Logistics.tsx`
 - `components/Warehouse.tsx`, `components/WarehouseManagement.tsx`
 - `components/Billing.tsx`, `components/Billing/*`
@@ -39,7 +37,6 @@
 - `components/Login.tsx` (dashboard entry before auth)
 - `components/Dashboard.tsx` (legacy aggregator still used)
 - `components/AIAssistant.tsx`
-- `components/MasterData.tsx`
 - `components/Fleet.tsx`, `components/Logistics.tsx`, etc. (top-level wrappers)
 
 ### Assets

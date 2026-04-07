@@ -1,6 +1,6 @@
 import { apiClient } from './apiClient';
-import { normalizeList, normalizeSingle } from './baseService';
-import type { ListResponse, PaginatedResponse } from '../types/api';
+import { normalizeSingle, parseFleetPaginatedResponse } from './baseService';
+import type { PaginatedResponse } from '../types/api';
 
 export interface UiVehicle {
   id: string;
@@ -15,6 +15,8 @@ export interface UiVehicle {
   vin: string;
   status: string;
   meta?: Record<string, unknown> | null;
+  latitude?: number | null;
+  longitude?: number | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -33,6 +35,8 @@ interface BackendVehicle {
   vin?: string | null;
   status?: string | null;
   meta?: Record<string, unknown> | null;
+  latitude?: number | null;
+  longitude?: number | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -54,21 +58,24 @@ const mapBackendVehicleToUi = (vehicle: BackendVehicle): UiVehicle => ({
   vin: String(vehicle.vin ?? ''),
   status: String(vehicle.status ?? 'active'),
   meta: vehicle.meta ?? null,
+  latitude: vehicle.latitude != null && !Number.isNaN(Number(vehicle.latitude)) ? Number(vehicle.latitude) : null,
+  longitude: vehicle.longitude != null && !Number.isNaN(Number(vehicle.longitude)) ? Number(vehicle.longitude) : null,
   created_at: vehicle.created_at ?? null,
   updated_at: vehicle.updated_at ?? null,
 });
 
 class VehiclesService {
-  async list(params: { page: number; pageSize: number; status?: string }): Promise<VehicleListResult> {
+  async list(params: { page: number; pageSize: number; status?: string; unassigned?: boolean }): Promise<VehicleListResult> {
     const query = new URLSearchParams({
       limit: String(params.pageSize),
       offset: String((params.page - 1) * params.pageSize),
     });
     if (params.status && params.status !== 'all') query.set('status', params.status);
-    const payload = await apiClient.get<ListResponse<BackendVehicle>>(`${VEHICLES_BASE_PATH}/?${query.toString()}`);
-    const rows = normalizeList<BackendVehicle>(payload, ['vehicles']);
+    if (params.unassigned) query.set('unassigned', 'true');
+    const payload = await apiClient.get<unknown>(`${VEHICLES_BASE_PATH}/?${query.toString()}`);
+    const { rows, total } = parseFleetPaginatedResponse<BackendVehicle>(payload, ['vehicles']);
     const mapped = rows.map(mapBackendVehicleToUi);
-    return { data: mapped, pagination: { total: mapped.length, page: params.page, pageSize: params.pageSize } };
+    return { data: mapped, pagination: { total, page: params.page, pageSize: params.pageSize } };
   }
 
   async getById(id: string): Promise<UiVehicle> {

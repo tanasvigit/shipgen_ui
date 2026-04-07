@@ -19,7 +19,6 @@ const Footer: React.FC<FooterProps> = ({ variant = 'default' }) => {
               <Link to="/logistics/orders" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Orders</Link>
               <Link to="/fleet/vehicles" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Fleet &amp; Operations</Link>
               <Link to="/analytics/reports" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Reports</Link>
-              <Link to="/live-operations" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Live Operations</Link>
             </div>
           </div>
         </div>
@@ -47,7 +46,6 @@ const Footer: React.FC<FooterProps> = ({ variant = 'default' }) => {
               <li><Link to="/logistics/orders" className="text-sm text-gray-400 hover:text-white transition-colors duration-300">Logistics</Link></li>
               <li><Link to="/fleet/vehicles" className="text-sm text-gray-400 hover:text-white transition-colors duration-300">Fleet &amp; Operations</Link></li>
               <li><Link to="/analytics/reports" className="text-sm text-gray-400 hover:text-white transition-colors duration-300">Reports &amp; Analytics</Link></li>
-              <li><Link to="/live-operations" className="text-sm text-gray-400 hover:text-white transition-colors duration-300">Live Operations</Link></li>
             </ul>
           </div>
           <div className="animate-fade-in-up animation-delay-150">

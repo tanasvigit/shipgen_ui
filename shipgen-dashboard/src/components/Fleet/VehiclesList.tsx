@@ -1,5 +1,6 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Truck, Eye, Edit, Trash2 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { vehiclesService, type UiVehicle } from '../../services/vehiclesService';
 import { ResponsiveTable } from '../ui/ResponsiveTable';
 import useListWithCrud from '../../hooks/useListWithCrud';
@@ -9,27 +10,42 @@ import Modal from '../common/Modal';
 import RouteDetailsModal from '../common/RouteDetailsModal';
 import VehicleForm from './forms/VehicleForm';
 
+const PAGE_SIZE = 20;
+
 const VehiclesList: React.FC = () => {
+  const location = useLocation();
+  const initialParams = new URLSearchParams(location.search);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>(initialParams.get('status') ?? 'all');
+  const [unassignedFilter, setUnassignedFilter] = useState(initialParams.get('unassigned') === 'true');
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [listTotal, setListTotal] = useState(0);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    setStatusFilter(params.get('status') ?? 'all');
+    setUnassignedFilter(params.get('unassigned') === 'true');
+    setPage(1);
+  }, [location.search]);
+
   const load = useCallback(async () => {
     const response = await vehiclesService.list({
       page,
-      pageSize: 20,
+      pageSize: PAGE_SIZE,
       status: statusFilter !== 'all' ? statusFilter : undefined,
+      unassigned: unassignedFilter || undefined,
     });
-    setTotalPages(Math.max(1, Math.ceil((response.pagination?.total || 0) / 20)));
+    setListTotal(response.pagination?.total ?? 0);
     return response.data;
-  }, [page, statusFilter]);
+  }, [page, statusFilter, unassignedFilter]);
 
   const { rows, loading, error, actionError, deleteWithConfirm, reload } = useListWithCrud<UiVehicle>(load, [load]);
+
+  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -59,7 +75,7 @@ const VehiclesList: React.FC = () => {
         createOnClick={() => setIsCreateOpen(true)}
         createLabel="New Vehicle"
         filters={
-          <div className="max-w-xs">
+          <div className="grid max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -70,9 +86,19 @@ const VehiclesList: React.FC = () => {
             >
               <option value="all">All Status</option>
               <option value="active">active</option>
-              <option value="maintenance">maintenance</option>
               <option value="inactive">inactive</option>
             </select>
+            <label className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={unassignedFilter}
+                onChange={(e) => {
+                  setUnassignedFilter(e.target.checked);
+                  setPage(1);
+                }}
+              />
+              Unassigned only
+            </label>
           </div>
         }
         searchPlaceholder={PH.searchVehicles}
@@ -103,6 +129,7 @@ const VehiclesList: React.FC = () => {
             onClick={() => {
               setSearchTerm('');
               setStatusFilter('all');
+              setUnassignedFilter(false);
               setPage(1);
             }}
             className="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
@@ -115,6 +142,10 @@ const VehiclesList: React.FC = () => {
         <ResponsiveTable
           data={filtered}
           keyExtractor={(vehicle) => vehicle.id}
+          onRowClick={(vehicle) => {
+            setSelectedId(vehicle.id);
+            setIsDetailsOpen(true);
+          }}
           columns={[
             {
               key: 'vehicle_id',
@@ -152,7 +183,8 @@ const VehiclesList: React.FC = () => {
                 <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setSelectedId(vehicle.id);
                       setIsDetailsOpen(true);
                     }}
@@ -162,7 +194,8 @@ const VehiclesList: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setSelectedId(vehicle.id);
                       setIsEditOpen(true);
                     }}
@@ -172,12 +205,13 @@ const VehiclesList: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={(e) => {
+                      e.stopPropagation();
                       void deleteWithConfirm(vehicle.id, (id) => vehiclesService.remove(id), {
                         confirmMessage: 'Delete this vehicle?',
                         successMessage: 'Vehicle deleted',
-                      })
-                    }
+                      });
+                    }}
                     className="rounded-lg p-2 text-red-600 transition hover:bg-red-50"
                   >
                     <Trash2 size={16} />
@@ -226,7 +260,7 @@ const VehiclesList: React.FC = () => {
         editLabel="Edit Vehicle"
       />
 
-      {totalPages > 1 && (
+      {listTotal > PAGE_SIZE && (
         <div className="mt-6 flex items-center justify-center gap-2">
           <button
             type="button"

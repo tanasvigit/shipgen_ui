@@ -91,16 +91,24 @@ class TestOrderSchemas:
     def test_order_create_valid(self):
         """Test valid order creation."""
         order = OrderCreate(
+            type="pickup",
+            customer_uuid="c0ffee00-0000-4000-8000-000000000001",
             internal_id="ORD-001",
-            status="pending",
         )
         assert order.internal_id == "ORD-001"
-        assert order.status == "pending"
+        assert order.type == "pickup"
 
     def test_order_update_valid(self):
         """Test valid order update."""
-        order = OrderUpdate(status="dispatched")
+        order = OrderUpdate(customer_uuid="c0ffee00-0000-4000-8000-000000000001", status="dispatched")
         assert order.status == "dispatched"
+        assert order.customer_uuid == "c0ffee00-0000-4000-8000-000000000001"
+
+    def test_order_update_partial_without_customer(self):
+        """PATCH may omit customer_uuid."""
+        order = OrderUpdate(notes="Driver called")
+        assert order.notes == "Driver called"
+        assert order.customer_uuid is None
 
 
 @pytest.mark.unit
@@ -110,18 +118,16 @@ class TestDriverSchemas:
     def test_driver_create_valid(self):
         """Test valid driver creation."""
         driver = DriverCreate(
-            name="Test Driver",
-            phone="+1234567890",
-            email="driver@example.com",
+            drivers_license_number="DL-TEST-001",
             status="active",
         )
-        assert driver.name == "Test Driver"
+        assert driver.drivers_license_number == "DL-TEST-001"
         assert driver.status == "active"
 
     def test_driver_update_valid(self):
         """Test valid driver update."""
-        driver = DriverUpdate(name="Updated Driver")
-        assert driver.name == "Updated Driver"
+        driver = DriverUpdate(drivers_license_number="DL-UPDATED")
+        assert driver.drivers_license_number == "DL-UPDATED"
 
 
 @pytest.mark.unit

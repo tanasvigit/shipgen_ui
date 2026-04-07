@@ -64,6 +64,7 @@ const moduleItems: ModuleItem[] = [
     children: [
       { id: 'orders', label: 'Orders', to: '/logistics/orders' },
       { id: 'dispatch-board', label: 'Dispatcher Board', to: '/logistics/orders/dispatch-board' },
+      { id: 'customers', label: 'Customers', to: '/logistics/customers' },
     ],
   },
 
@@ -71,8 +72,9 @@ const moduleItems: ModuleItem[] = [
   {
     id: 'fleet-operations',
     label: 'Fleet & Operations',
-    to: '/fleet/vehicles',
+    to: '/fleet/dashboard',
     children: [
+      { id: 'fleet-dashboard', label: 'Fleet dashboard', to: '/fleet/dashboard' },
       { id: 'vehicles', label: 'Vehicles', to: '/fleet/vehicles' },
       { id: 'drivers', label: 'Drivers', to: '/fleet/drivers' },
       { id: 'fleets', label: 'Fleets', to: '/fleet/fleets' },
@@ -191,12 +193,6 @@ const moduleItems: ModuleItem[] = [
       { id: 'fuel-reports', label: 'Fuel Reports', to: '/fleet/fuel-reports' },
     ],
   },
-
-  // Master Data (legacy entry; route preserved in App)
-  { id: 'master-data', label: 'Master Data', to: '/master-data' },
-
-  // 14. Live Operations
-  { id: 'live-operations', label: 'Live Operations', to: '/live-operations' },
 ];
 
 const cn = (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');

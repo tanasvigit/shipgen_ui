@@ -3,7 +3,7 @@ import { ArrowLeft, Check, RefreshCw } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { driversService, UiDriver } from '../../services/driversService';
-import { ordersService, UiOrder } from '../../services/ordersService';
+import { ordersService, orderCustomerLabel, UiOrder } from '../../services/ordersService';
 import { vehiclesService, UiVehicle } from '../../services/vehiclesService';
 import { Button } from '../ui/Button';
 import PageContainer from '../ui/PageContainer';
@@ -228,10 +228,15 @@ const DispatchBoard: React.FC = () => {
     const q = orderSearch.trim().toLowerCase();
     if (!q) return statusOrders;
     return statusOrders.filter((order) => {
-      const blob = `${order.internal_id || ''} ${order.public_id || ''} ${order.id} ${order.meta?.customer_name || ''}`.toLowerCase();
+      const blob = `${order.internal_id || ''} ${order.public_id || ''} ${order.id} ${orderCustomerLabel(order)}`.toLowerCase();
       return blob.includes(q);
     });
   }, [statusOrders, orderSearch]);
+
+  const displayCustomer = (o: UiOrder) => {
+    const l = orderCustomerLabel(o);
+    return l === '—' ? 'No customer' : l;
+  };
 
   const handleAssign = async (order: UiOrder) => {
     try {
@@ -362,7 +367,7 @@ const DispatchBoard: React.FC = () => {
                   }}
                 >
                   <p className="text-sm font-semibold text-primary-700">{order.internal_id || order.public_id || order.id}</p>
-                  <p className="text-xs text-gray-500">{order.meta?.customer_name || 'No customer'}</p>
+                  <p className="text-xs text-gray-500">{displayCustomer(order)}</p>
                   <div className="mt-1">
                     <StatusBadge label={order.status} variant={statusVariant(order.status)} />
                   </div>
@@ -378,7 +383,7 @@ const DispatchBoard: React.FC = () => {
               <>
                 <div className="rounded-lg border border-gray-100 p-3">
                   <p className="text-sm font-semibold text-primary-700">{selectedOrder.internal_id || selectedOrder.public_id || selectedOrder.id}</p>
-                  <p className="text-xs text-gray-500">{selectedOrder.meta?.customer_name || 'No customer'}</p>
+                  <p className="text-xs text-gray-500">{displayCustomer(selectedOrder)}</p>
                   <div className="mt-1">
                     <StatusBadge label={selectedOrder.status} variant={statusVariant(selectedOrder.status)} />
                   </div>

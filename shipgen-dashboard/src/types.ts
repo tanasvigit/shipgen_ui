@@ -1,12 +1,29 @@
 
 export enum UserRole {
-  SUPER_ADMIN = 'SUPER_ADMIN',
-  COMPANY_ADMIN = 'COMPANY_ADMIN',
+  ADMIN = 'ADMIN',
   OPERATIONS_MANAGER = 'OPERATIONS_MANAGER',
-  WAREHOUSE_MANAGER = 'WAREHOUSE_MANAGER',
+  DISPATCHER = 'DISPATCHER',
   DRIVER = 'DRIVER',
-  CUSTOMER = 'CUSTOMER',
-  FINANCE = 'FINANCE'
+  VIEWER = 'VIEWER',
+}
+
+const LEGACY_ROLE_MAP: Record<string, UserRole> = {
+  SUPER_ADMIN: UserRole.ADMIN,
+  COMPANY_ADMIN: UserRole.ADMIN,
+  OPERATIONS_MANAGER: UserRole.OPERATIONS_MANAGER,
+  WAREHOUSE_MANAGER: UserRole.VIEWER,
+  FINANCE: UserRole.VIEWER,
+  CUSTOMER: UserRole.VIEWER,
+  DRIVER: UserRole.DRIVER,
+};
+
+/** Normalize API or legacy role strings to a logistics role. Missing/unknown → DISPATCHER. */
+export function normalizeUserRole(raw?: string | null): UserRole {
+  if (!raw) return UserRole.DISPATCHER;
+  const u = raw.trim().toUpperCase();
+  if (LEGACY_ROLE_MAP[u]) return LEGACY_ROLE_MAP[u];
+  if ((Object.values(UserRole) as string[]).includes(u)) return u as UserRole;
+  return UserRole.DISPATCHER;
 }
 
 export enum TransactionType {
@@ -104,7 +121,7 @@ export interface Invoice {
   id: string;
   companyId: string;
   invoiceNumber: string;
-  invoiceType: InvoiceType;
+  invoiceType: string;
   referenceType?: string;
   referenceId?: string;
   subtotal: number;

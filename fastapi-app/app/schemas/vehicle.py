@@ -1,7 +1,21 @@
 from datetime import datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, model_validator
+
+
+def _meta_coord(meta: Optional[dict[str, Any]], key: str) -> Optional[float]:
+    if not meta or not isinstance(meta, dict):
+        return None
+    raw = meta.get(key)
+    if raw is None:
+        return None
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        return float(raw)
+    try:
+        return float(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
 
 
 class VehicleBase(BaseModel):
@@ -52,21 +66,29 @@ class VehicleUpdate(BaseModel):
     meta: Optional[dict[str, Any]] = None
 
 
-
-
 class VehicleOut(VehicleBase):
-    id: Optional[int] = None
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
+    id: Optional[int] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+    @model_validator(mode="after")
+    def fill_coords_from_meta(self) -> "VehicleOut":
+        meta = self.meta if isinstance(self.meta, dict) else None
+        if self.latitude is None:
+            self.latitude = _meta_coord(meta, "latitude")
+        if self.longitude is None:
+            self.longitude = _meta_coord(meta, "longitude")
+        return self
 
 
 class VehicleResponse(BaseModel):
     vehicle: VehicleOut
 
 
-class VehiclesResponse(BaseModel):
-    vehicles: List[VehicleOut]
-
-
-
+class VehiclesListResponse(BaseModel):
+    data: List[VehicleOut]
+    total: int
+    limit: int
+    offset: int

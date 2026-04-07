@@ -17,6 +17,7 @@ class LoginUser(BaseModel):
     id: str  # always a non-null string (uuid or cast from int)
     email: Optional[str] = None
     name: Optional[str] = None
+    role: Optional[str] = None
 
 
 class MeUser(BaseModel):
@@ -26,6 +27,7 @@ class MeUser(BaseModel):
     email: Optional[str] = None
     name: Optional[str] = None
     type: Optional[str] = None
+    role: Optional[str] = None
 
 
 class LoginResponse(BaseModel):

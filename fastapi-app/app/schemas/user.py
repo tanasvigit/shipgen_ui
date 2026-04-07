@@ -1,7 +1,10 @@
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, EmailStr
+
+
+LogisticsRole = Literal["ADMIN", "OPERATIONS_MANAGER", "DISPATCHER", "DRIVER", "VIEWER"]
 
 
 class UserBase(BaseModel):
@@ -43,6 +46,7 @@ class UserCreate(BaseModel):
     company_uuid: Optional[str] = None
     timezone: Optional[str] = None
     country: Optional[str] = None
+    role: Optional[LogisticsRole] = None
 
 
 class UserUpdate(BaseModel):
@@ -52,6 +56,7 @@ class UserUpdate(BaseModel):
     timezone: Optional[str] = None
     country: Optional[str] = None
     status: Optional[str] = None
+    role: Optional[LogisticsRole] = None
 
 
 class UserOut(UserBase):

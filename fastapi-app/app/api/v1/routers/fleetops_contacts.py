@@ -1,16 +1,44 @@
+from datetime import datetime
 from typing import List
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.v1.routers.auth import _get_current_user
 from app.core.database import get_db
+from app.core.roles import (
+    ADMIN,
+    DISPATCHER,
+    DRIVER,
+    OPERATIONS_MANAGER,
+    effective_user_role,
+    require_roles,
+)
 from app.models.contact import Contact
+from app.models.order import Order
 from app.models.user import User
 from app.schemas.contact import ContactCreate, ContactOut, ContactUpdate, ContactResponse, ContactsResponse
 
 router = APIRouter(prefix="/fleetops/v1/contacts", tags=["fleetops-contacts"])
+
+
+def _require_company_uuid(current: User) -> str:
+    if not current.company_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current user is not associated with a company.",
+        )
+    return current.company_uuid
+
+
+def _deny_driver_customer_access(current: User) -> None:
+    if effective_user_role(current) == DRIVER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        )
 
 
 @router.get("/", response_model=ContactsResponse)
@@ -19,8 +47,17 @@ def list_contacts(
     current: User = Depends(_get_current_user),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    kind: str | None = Query(None, description="Filter by contact type, e.g. customer"),
+    search: str | None = Query(None, description="Search name, phone, or email"),
 ):
-    q = db.query(Contact).filter(Contact.company_uuid == current.company_uuid, Contact.deleted_at.is_(None))
+    _deny_driver_customer_access(current)
+    company_uuid = _require_company_uuid(current)
+    q = db.query(Contact).filter(Contact.company_uuid == company_uuid, Contact.deleted_at.is_(None))
+    if kind:
+        q = q.filter(Contact.type == kind)
+    if search and search.strip():
+        s = f"%{search.strip()}%"
+        q = q.filter(or_(Contact.name.ilike(s), Contact.phone.ilike(s), Contact.email.ilike(s)))
     contacts = q.offset(offset).limit(limit).all()
     return {"contacts": contacts}
 
@@ -31,9 +68,15 @@ def get_contact(
     db: Session = Depends(get_db),
     current: User = Depends(_get_current_user),
 ):
+    _deny_driver_customer_access(current)
+    company_uuid = _require_company_uuid(current)
     contact = (
         db.query(Contact)
-        .filter(Contact.company_uuid == current.company_uuid, (Contact.uuid == id) | (Contact.public_id == id))
+        .filter(
+            Contact.company_uuid == company_uuid,
+            Contact.deleted_at.is_(None),
+            (Contact.uuid == id) | (Contact.public_id == id),
+        )
         .first()
     )
     if not contact:
@@ -45,18 +88,21 @@ def get_contact(
 def create_contact(
     payload: ContactCreate,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
+    company_uuid = _require_company_uuid(current)
     contact = Contact()
     contact.uuid = str(uuid.uuid4())
     contact.public_id = f"contact_{uuid.uuid4().hex[:12]}"
-    contact.company_uuid = current.company_uuid
+    contact.company_uuid = company_uuid
     contact.name = payload.name
     contact.email = payload.email
     contact.phone = payload.phone
     contact.type = payload.type or "contact"
     contact.title = payload.title
     contact.meta = payload.meta
+    contact.created_at = datetime.utcnow()
+    contact.updated_at = datetime.utcnow()
 
     db.add(contact)
     db.commit()
@@ -70,11 +116,16 @@ def update_contact(
     id: str,
     payload: ContactUpdate,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
+    company_uuid = _require_company_uuid(current)
     contact = (
         db.query(Contact)
-        .filter(Contact.company_uuid == current.company_uuid, (Contact.uuid == id) | (Contact.public_id == id))
+        .filter(
+            Contact.company_uuid == company_uuid,
+            Contact.deleted_at.is_(None),
+            (Contact.uuid == id) | (Contact.public_id == id),
+        )
         .first()
     )
     if not contact:
@@ -93,15 +144,36 @@ def update_contact(
 def delete_contact(
     id: str,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN)),
 ):
+    company_uuid = _require_company_uuid(current)
     contact = (
         db.query(Contact)
-        .filter(Contact.company_uuid == current.company_uuid, (Contact.uuid == id) | (Contact.public_id == id))
+        .filter(
+            Contact.company_uuid == company_uuid,
+            Contact.deleted_at.is_(None),
+            (Contact.uuid == id) | (Contact.public_id == id),
+        )
         .first()
     )
     if not contact:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contact not found.")
+
+    if (contact.type or "").lower() == "customer" and contact.uuid:
+        has_orders = (
+            db.query(Order)
+            .filter(
+                Order.company_uuid == company_uuid,
+                Order.customer_uuid == contact.uuid,
+                Order.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if has_orders:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete customer with existing orders",
+            )
 
     contact.deleted_at = datetime.utcnow()
     db.add(contact)

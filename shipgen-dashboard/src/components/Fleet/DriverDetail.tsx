@@ -122,11 +122,11 @@ const DriverDetail: React.FC = () => {
           </div>
           <div>
             <label className="text-xs text-gray-500 uppercase mb-1 block">latitude</label>
-            <p className="text-sm font-medium text-gray-900">{driver.latitude ?? '-'}</p>
+            <p className="text-sm font-medium text-gray-900">{driver.latitude != null ? String(driver.latitude) : '-'}</p>
           </div>
           <div>
             <label className="text-xs text-gray-500 uppercase mb-1 block">longitude</label>
-            <p className="text-sm font-medium text-gray-900">{driver.longitude ?? '-'}</p>
+            <p className="text-sm font-medium text-gray-900">{driver.longitude != null ? String(driver.longitude) : '-'}</p>
           </div>
           <div>
             <label className="text-xs text-gray-500 uppercase mb-1 block">heading</label>

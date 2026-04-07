@@ -1,0 +1,479 @@
+================================================================================
+BUSINESS DOCUMENTATION (DETAILED) — SHIPGEN LOGISTICS PLATFORM
+================================================================================
+File purpose:
+This is a complete business-level document for operations, product, support,
+and implementation teams. It explains:
+1) business modules,
+2) each major field used in workflows,
+3) end-to-end operational workflows,
+4) user experience and role behavior.
+
+Scope:
+- Backend: fastapi-app
+- Frontend: shipgen-dashboard
+- Multi-tenant, RBAC, fleet + logistics core flows
+
+--------------------------------------------------------------------------------
+1) BUSINESS CONTEXT
+--------------------------------------------------------------------------------
+
+The platform is a multi-tenant logistics operating system used by internal teams
+to run daily transportation operations:
+- manage users and companies,
+- onboard customers,
+- create and dispatch orders,
+- assign drivers and vehicles,
+- track operational status and exceptions,
+- monitor KPIs through fleet dashboard,
+- run supporting admin modules (reports, schedules, notifications, etc.).
+
+Business value delivered:
+- Faster dispatch cycles,
+- Better fleet utilization,
+- Controlled role-based actions,
+- Company-level data isolation,
+- Unified command center UI for logistics teams.
+
+--------------------------------------------------------------------------------
+2) BUSINESS PERSONAS
+--------------------------------------------------------------------------------
+
+1. ADMIN
+   - Full control over users, companies, logistics operations, and destructive
+     actions.
+2. OPERATIONS_MANAGER
+   - Full operational execution for fleet and logistics; no full user admin.
+3. DISPATCHER
+   - Handles day-to-day order creation, assignment, transitions, and customer
+     management.
+4. DRIVER
+   - Limited to their assigned orders and constrained transition actions.
+5. VIEWER
+   - Read-only operations visibility.
+
+Role enforcement is implemented in backend and mirrored in frontend navigation.
+
+--------------------------------------------------------------------------------
+3) BUSINESS MODULES (END-TO-END)
+--------------------------------------------------------------------------------
+
+A) Identity and Access
+- Login, token-based session, role normalization, access filtering.
+
+B) Company and User Management
+- Company master setup and user provisioning under company scope.
+
+C) Logistics Customers
+- Customer records captured as contact entities with type=customer.
+
+D) Orders and Dispatch Lifecycle
+- Order capture -> assignment -> transition progression -> completion/closure.
+
+E) Driver Management
+- Driver master + availability/online state + telemetry updates.
+
+F) Vehicle Management
+- Vehicle master + assignment relation + telemetry/meta details.
+
+G) Fleet Dashboard
+- KPI and assignment visibility in one operational view.
+
+H) Supporting Modules
+- Contacts, vendors, places, issues, fuel reports, schedules, reports,
+  notifications, files, API logs, etc.
+
+--------------------------------------------------------------------------------
+4) MASTER DATA FIELD DICTIONARY (BUSINESS VIEW)
+--------------------------------------------------------------------------------
+
+4.1 Company Fields
+- uuid: unique business company identifier.
+- public_id: user-facing identifier for display/search.
+- name: legal/business display name.
+- description: company profile text.
+- phone: primary contact number.
+- website_url: company website.
+- currency: operating currency.
+- country: operating country.
+- timezone: business timezone.
+- status: lifecycle (active/inactive etc.).
+- slug: URL-safe identifier.
+- options: extensible configuration JSON.
+- created_at / updated_at: audit timestamps.
+
+4.2 User Fields
+- uuid / public_id: user business IDs.
+- company_uuid: tenant owner company.
+- name / username: identity fields.
+- email / phone: communication identifiers.
+- role: ADMIN | OPERATIONS_MANAGER | DISPATCHER | DRIVER | VIEWER.
+- type: user category.
+- timezone / country / locale: locale settings.
+- status: active/inactive style state.
+- avatar_url: profile image.
+- meta: extensible profile/business settings.
+- email_verified_at / phone_verified_at: verification tracking.
+- last_login / last_seen_at / is_online: activity visibility.
+- session_status / is_admin: computed/derived session/business flags.
+- created_at / updated_at: audit timestamps.
+
+4.3 Customer Fields (stored in contacts with type=customer)
+- uuid / public_id
+- company_uuid
+- name (required in UI)
+- phone (required in UI)
+- email (optional)
+- type (fixed as customer for customer workflows)
+- title (optional)
+- meta.address (address is stored here from customer form)
+- created_at / updated_at
+
+4.4 Driver Fields
+- uuid / public_id
+- company_uuid
+- user_uuid: optional link to user account.
+- vehicle_uuid: persistent assignment link to vehicle.
+- vendor_uuid / current_job_uuid: operational extension links.
+- drivers_license_number: driver identity/document key (required in UI form).
+- status: active/inactive/other operational state.
+- online: 0/1 online flag.
+- latitude / longitude / heading / speed / altitude: movement telemetry.
+- country / city / currency: optional context fields.
+- slug
+- created_at / updated_at
+
+4.5 Vehicle Fields
+- uuid / public_id
+- company_uuid
+- vendor_uuid
+- make / model / year / trim
+- type
+- plate_number (required business identifier)
+- vin (required business identifier)
+- status (active/maintenance/inactive in UI)
+- photo_uuid / avatar_url
+- vin_data (decoded VIN metadata if available)
+- meta (extensible JSON, commonly telemetry/color/notes)
+  - meta.latitude / meta.longitude
+  - meta.color
+  - meta.notes
+- created_at / updated_at
+
+4.6 Order Fields
+- uuid / public_id
+- company_uuid
+- internal_id: business-facing order reference (required in form).
+- customer_uuid: linked customer (required at create from UI).
+- customer_type
+- customer_display_name: API-enriched display name for UX.
+- type: pickup/delivery business type.
+- status: lifecycle state.
+- notes
+- scheduled_at: planned execution date-time.
+- driver_assigned_uuid / vehicle_assigned_uuid: dispatch links.
+- dispatched / dispatched_at
+- started / started_at
+- pod_required / pod_method
+- is_route_optimized
+- distance / time / adhoc / adhoc_distance
+- meta:
+  - priority (normal/high),
+  - pickup { address, lat, lng },
+  - delivery { address, lat, lng },
+  - additional business attributes.
+- options:
+  - pod_required and future extensible options.
+- deleted_at (soft delete behavior in backend models)
+- created_at / updated_at
+
+4.7 Fleet Dashboard Payload Fields
+- kpis.drivers_total
+- kpis.drivers_active
+- kpis.drivers_online
+- kpis.drivers_unassigned
+- kpis.vehicles_total
+- kpis.vehicles_active
+- kpis.vehicles_unassigned
+- kpis.vehicles_in_use
+- drivers[] rows:
+  - driver_uuid, public_id, status, online, vehicle_uuid, vehicle_plate,
+    latitude, longitude
+- vehicles[] rows:
+  - vehicle_uuid, plate_number, status, assigned_driver_uuid,
+    assigned_driver_name, latitude, longitude
+
+--------------------------------------------------------------------------------
+5) CORE BUSINESS WORKFLOWS (END-TO-END)
+--------------------------------------------------------------------------------
+
+5.1 Login and Session Workflow
+1. User opens dashboard URL.
+2. Login form captures identity/email + password.
+3. UI calls /int/v1/auth/login.
+4. Backend validates credentials, returns token + role profile.
+5. UI stores token and role; protected routes unlock.
+6. On 401 later, UI clears session and routes back to login.
+
+Business outcome:
+- Controlled access and role-sensitive navigation.
+
+5.2 Company-Scoped Access Workflow (Multi-tenancy)
+1. Authenticated user hits fleet endpoint.
+2. Backend resolves current user company_uuid.
+3. Query is filtered by company_uuid.
+4. Cross-company records are not exposed (commonly 404 behavior).
+
+Business outcome:
+- Data separation per tenant/company.
+
+5.3 Customer Management Workflow
+1. Operations user opens Logistics -> Customers.
+2. Create/Edit form fields:
+   - Name (required), Phone (required), Email (optional), Address (optional).
+3. UI maps address to meta.address.
+4. Backend stores customer as contact type=customer.
+5. Customer becomes selectable in order creation.
+
+Business outcome:
+- Master customer profile reusable in operations.
+
+5.4 Order Creation Workflow
+1. Dispatcher/Admin opens New Order.
+2. Mandatory business inputs:
+   - Internal ID, Type, Customer, Scheduled At, Pickup, Delivery.
+3. Validation:
+   - pickup and delivery must include address + lat + lng,
+   - pickup and delivery cannot be same coordinates.
+4. Optional business inputs:
+   - notes, status override, priority, POD required.
+5. UI sends payload with meta.pickup/meta.delivery/meta.priority/options.
+6. Backend persists order and returns order object.
+
+Business outcome:
+- Structured order captured with route and customer context.
+
+5.5 Dispatch Assignment Workflow
+1. Staff role opens order assignment action.
+2. Select or auto-pick driver/vehicle based on availability rules.
+3. Backend sets driver_assigned_uuid and vehicle_assigned_uuid.
+4. Lifecycle event and notification may be generated.
+
+Business outcome:
+- Order is operationally allocated for execution.
+
+5.6 Order Transition Workflow
+Typical guarded sequence:
+created -> assigned -> dispatched -> arrived_at_pickup -> picked_up ->
+in_transit -> out_for_delivery -> delivered -> completed
+
+Role behavior:
+- DRIVER: only forward step (assigned orders).
+- STAFF (ADMIN/OPS_MANAGER/DISPATCHER): full allowed transition controls.
+- VIEWER: no mutation.
+
+Business outcome:
+- Consistent and auditable order lifecycle.
+
+5.7 Exception Handling Workflow
+1. Staff raises exception against order.
+2. Issue is created.
+3. Order may move to delayed/reassigned state.
+4. Lifecycle entry recorded.
+
+Business outcome:
+- Transparent exception tracking and operational recovery.
+
+5.8 Driver Management Workflow
+1. User opens Fleet -> Drivers list.
+2. Filters available: status, online, unassigned.
+3. Create/edit fields:
+   - drivers_license_number (required),
+   - status,
+   - online (edit mode),
+   - optional telemetry updates via track APIs.
+4. Clicking full row opens details modal/view.
+
+Business outcome:
+- Operational roster with real-time readiness context.
+
+5.9 Vehicle Management Workflow
+1. User opens Fleet -> Vehicles list.
+2. Filters available: status, unassigned.
+3. Create/edit fields:
+   - make, model, type, vin, plate_number, status (required set),
+   - year/trim/vendor optional,
+   - edit mode meta.color and meta.notes.
+4. Clicking full row opens details modal/view.
+5. Assign-driver flow links driver.vehicle_uuid where used.
+
+Business outcome:
+- Fleet inventory and assignment readiness maintained.
+
+5.10 Fleet Dashboard Workflow
+1. User opens Fleet Dashboard.
+2. Single API fetch loads KPI + driver/vehicle tables.
+3. KPI cards are clickable and route to filtered list pages:
+   - active drivers, online drivers, unassigned, in-use vehicles, etc.
+4. Dashboard tables show assignment links using both:
+   - direct driver.vehicle_uuid relation, and
+   - active order assignment fallback mapping.
+
+Business outcome:
+- Command center with drill-down into actionable queues.
+
+--------------------------------------------------------------------------------
+6) USER EXPERIENCE (UX) SPECIFICATION
+--------------------------------------------------------------------------------
+
+6.1 UX Navigation Model
+- Sidebar grouped by business domains.
+- Fleet has sub-navigation with Dashboard first.
+- Hash-based routing for stable static hosting.
+
+6.2 List Experience Pattern
+- Standard list shell:
+  title, subtitle, search, filters, create button.
+- Table rows are clickable for quick detail context.
+- Inline actions remain available: view/edit/delete.
+- Pagination shown when total > page size.
+
+6.3 Form UX Pattern
+- Modal form pattern for create/edit.
+- Required fields clearly validated.
+- Inline errors shown in red alert blocks.
+- Submit state disables action and shows loading behavior.
+
+6.4 Detail UX Pattern
+- RouteDetailsModal/view pages show complete record details.
+- Detail pages support edit/delete actions (role dependent).
+
+6.5 KPI and Drill-down UX
+- KPI cards behave like buttons with hover affordance.
+- Click routes users directly to filtered operational queue.
+
+6.6 Error and Recovery UX
+- Friendly error messages for load/save failures.
+- Authentication failures force secure logout path.
+- Validation errors block invalid submission early.
+
+6.7 Empty-State UX
+- Meaningful empty messages:
+  - no data yet (onboarding hint),
+  - no match for filters/search (clear filters CTA).
+
+--------------------------------------------------------------------------------
+7) ROLE-WISE USER EXPERIENCE SUMMARY
+--------------------------------------------------------------------------------
+
+ADMIN
+- Sees full navigation and full CRUD actions.
+- Can manage users and perform destructive actions.
+
+OPERATIONS_MANAGER
+- Full operational logistics controls.
+- No full user admin operations.
+
+DISPATCHER
+- Strong operational controls:
+  create/update orders, assign, transition, customer operations.
+
+DRIVER
+- Limited operational view:
+  assigned orders only + controlled transitions.
+- Cannot perform assignment/dispatch/customer management.
+
+VIEWER
+- Visibility-focused role.
+- No write actions in core operational modules.
+
+--------------------------------------------------------------------------------
+8) BUSINESS RULES (CRITICAL)
+--------------------------------------------------------------------------------
+
+1. Company boundary rule
+- Every operational fleet record is scoped by company_uuid.
+
+2. Unassigned driver rule
+- Driver counted unassigned only when:
+  no vehicle link AND not assigned on active non-terminal orders.
+
+3. Unassigned vehicle rule
+- Vehicle counted unassigned only when:
+  no linked driver AND not assigned on active non-terminal orders.
+
+4. Assignment display rule
+- If direct relationship is missing, dashboard uses active order mapping
+  fallback so assignment is still visible to operations users.
+
+5. Authentication rule
+- JWT token mandatory for protected routes.
+
+6. Authorization rule
+- Backend is source of truth; frontend visibility is convenience only.
+
+--------------------------------------------------------------------------------
+9) OPERATIONAL DATA QUALITY CHECKLIST
+--------------------------------------------------------------------------------
+
+Before go-live or weekly review:
+- Every active order has valid customer_uuid.
+- Pickup/delivery each has address + coordinates.
+- Drivers and vehicles have normalized status values.
+- Unassigned KPI trend is monitored for capacity imbalance.
+- Orphan assignments (driver/vehicle deleted while linked) are reviewed.
+- Role assignments on users are valid fixed roles only.
+
+--------------------------------------------------------------------------------
+10) BUSINESS REPORTING AND KPI INTERPRETATION
+--------------------------------------------------------------------------------
+
+Key KPI interpretation:
+- Drivers Total: roster size.
+- Drivers Active: deployable workforce.
+- Drivers Online: currently available in real-time.
+- Drivers Unassigned: capacity not currently paired/engaged.
+- Vehicles Total: fleet inventory.
+- Vehicles Active: roadworthy/usable fleet.
+- Vehicles In Use: active dispatch utilization.
+- Vehicles Unassigned: idle/available or underutilized assets.
+
+Recommended business actions:
+- High unassigned + low in-use => optimize dispatch demand generation.
+- High in-use + low unassigned => potential capacity shortage.
+- Low online ratio among active drivers => attendance/shift issue.
+
+--------------------------------------------------------------------------------
+11) END-TO-END BUSINESS JOURNEY (EXAMPLE)
+--------------------------------------------------------------------------------
+
+Scenario: morning dispatch cycle
+1. Ops manager logs in and opens Fleet Dashboard.
+2. Reviews online drivers and vehicles in use.
+3. Clicks "Unassigned drivers" KPI to open filtered driver queue.
+4. Verifies roster and updates driver status/online flags.
+5. Opens Logistics -> Orders and creates new pickup order:
+   customer + schedule + pickup + delivery + priority.
+6. Runs assignment workflow to attach available driver and vehicle.
+7. Driver progresses order statuses through the day.
+8. Exception occurs -> dispatcher raises exception; issue is logged.
+9. Reassignment performed, order completes.
+10. End-of-day analytics and operations reviews are done from dashboard/list pages.
+
+Business result:
+- Full operational continuity with auditability and role-safe actions.
+
+--------------------------------------------------------------------------------
+12) BUSINESS GLOSSARY
+--------------------------------------------------------------------------------
+
+- Tenant: One customer company in multi-tenant system.
+- Dispatch: Process of assigning resources to an order.
+- Unassigned: Resource not persistently linked and not actively allocated.
+- Terminal status: End state where order is no longer active (e.g., completed).
+- POD: Proof of Delivery requirement for order completion evidence.
+- Lifecycle event: Time-stamped business transition/action on order timeline.
+
+--------------------------------------------------------------------------------
+END OF DOCUMENT
+--------------------------------------------------------------------------------

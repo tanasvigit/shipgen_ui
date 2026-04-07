@@ -42,12 +42,17 @@ const mapBackendContactToUi = (c: BackendContact): MockContact => ({
 });
 
 class ContactsService {
-  async list(params: { page: number; pageSize: number }): Promise<ContactListResult> {
+  async list(params: { page: number; pageSize: number; kind?: string; search?: string }): Promise<ContactListResult> {
     const query = new URLSearchParams({
       limit: String(params.pageSize),
       offset: String((params.page - 1) * params.pageSize),
     });
-    const payload = await apiClient.get<ListResponse<BackendContact>>(`${CONTACTS_BASE_PATH}/?${query.toString()}`);
+    if (params.kind) query.set('kind', params.kind);
+    if (params.search?.trim()) query.set('search', params.search.trim());
+    const payload = await apiClient.get<ListResponse<BackendContact>>(
+      `${CONTACTS_BASE_PATH}/`,
+      Object.fromEntries(query.entries()) as Record<string, string>,
+    );
     const rows = normalizeList<BackendContact>(payload, ['contacts']);
     const mapped = rows.map(mapBackendContactToUi);
     return { data: mapped, pagination: { total: mapped.length, page: params.page, pageSize: params.pageSize } };
