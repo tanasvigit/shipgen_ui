@@ -313,6 +313,8 @@ def create_app() -> FastAPI:
         "http://127.0.0.1:4200",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://192.168.0.171:5173",
+        "http://192.168.1.129:5173",
     ]
     
     # Add configured origins from settings

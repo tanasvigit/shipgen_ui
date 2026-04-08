@@ -15,7 +15,7 @@ const UserEdit: React.FC = () => {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Edit User</h1>
-          <p className="text-sm text-gray-600 mt-1">PATCH /int/v1/users/{'{id}'}</p>
+          <p className="text-sm text-gray-600 mt-1">PATCH /int/v1/users/{'{uuid}'}</p>
         </div>
       </div>
 

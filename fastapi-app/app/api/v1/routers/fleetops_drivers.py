@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.routers.auth import _get_current_user
 from app.core.company_scope import require_company_uuid
 from app.core.database import get_db
+from app.core.roles import ADMIN, DISPATCHER, OPERATIONS_MANAGER, require_roles
 from app.models.driver import Driver
 from app.models.order import Order
 from app.models.user import User
@@ -117,9 +118,24 @@ def get_driver(
 def create_driver(
     payload: DriverCreate,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     company_uuid = require_company_uuid(current)
+    if payload.user_uuid:
+        existing_link = (
+            db.query(Driver)
+            .filter(
+                Driver.company_uuid == company_uuid,
+                Driver.user_uuid == payload.user_uuid,
+                Driver.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if existing_link:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A driver is already linked to this user_uuid.",
+            )
     driver = Driver()
     driver.uuid = str(uuid.uuid4())
     driver.public_id = f"driver_{uuid.uuid4().hex[:12]}"
@@ -137,8 +153,11 @@ def create_driver(
 
 
 @router.post("/register-device")
-def register_device_global():
+def register_device_global(
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
+):
     """Stub endpoint mirroring DriverController@registerDevice (global)."""
+    _ = current
     return {"status": "ok"}
 
 
@@ -146,7 +165,7 @@ def register_device_global():
 def track_driver_global(
     payload: DriverTrackBody,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     """POST /drivers/track – update location for a driver by driver_id in body."""
     company_uuid = require_company_uuid(current)
@@ -173,7 +192,7 @@ def track_driver_global(
 def switch_organization_global(
     payload: DriverSwitchOrgBody,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     """POST /drivers/switch-organization – restricted to current company (no cross-tenant moves)."""
     company_uuid = require_company_uuid(current)
@@ -199,14 +218,31 @@ def update_driver(
     driver_id: str,
     payload: DriverUpdate,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     company_uuid = require_company_uuid(current)
     driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_id)
     if not driver:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found.")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    if "user_uuid" in updates and updates["user_uuid"]:
+        existing_link = (
+            db.query(Driver)
+            .filter(
+                Driver.company_uuid == company_uuid,
+                Driver.user_uuid == updates["user_uuid"],
+                Driver.deleted_at.is_(None),
+                Driver.id != driver.id,
+            )
+            .first()
+        )
+        if existing_link:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A driver is already linked to this user_uuid.",
+            )
+    for field, value in updates.items():
         setattr(driver, field, value)
 
     db.add(driver)
@@ -220,7 +256,7 @@ def update_driver(
 def delete_driver(
     driver_id: str,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     company_uuid = require_company_uuid(current)
     driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_id)
@@ -239,7 +275,7 @@ def delete_driver(
 def toggle_online(
     driver_id: str,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     company_uuid = require_company_uuid(current)
     driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_id)
@@ -259,7 +295,7 @@ def track_driver_per_id(
     driver_id: str,
     payload: DriverUpdate,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     company_uuid = require_company_uuid(current)
     driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_id)
@@ -281,7 +317,7 @@ def track_driver_per_id(
 def register_device_for_driver(
     driver_id: str,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     """Stub endpoint for per-driver device registration."""
     company_uuid = require_company_uuid(current)
@@ -296,7 +332,7 @@ def switch_organization(
     driver_id: str,
     payload: dict,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     """Simplified switch-organization: company must stay the current user's company."""
     company_uuid = require_company_uuid(current)

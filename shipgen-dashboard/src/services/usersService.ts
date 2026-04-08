@@ -8,6 +8,7 @@ export interface UiUser {
   id: string;
   name: string;
   email: string;
+  role: string;
   status: string;
   created_at: string;
 }
@@ -15,14 +16,16 @@ export interface UiUser {
 export interface UserInput {
   name: string;
   email: string;
+  role: 'ADMIN' | 'OPERATIONS_MANAGER' | 'DISPATCHER' | 'DRIVER' | 'VIEWER';
   password?: string;
   status?: string;
 }
 
 const mapUser = (row: UnknownRecord): UiUser => ({
-  id: String(row.uuid ?? row.public_id ?? row.id ?? ''),
+  id: String(row.uuid ?? ''),
   name: String(row.name ?? ''),
   email: String(row.email ?? ''),
+  role: String(row.role ?? ''),
   status: String(row.status ?? ''),
   created_at: String(row.created_at ?? ''),
 });
@@ -45,6 +48,7 @@ class UsersService {
     const payload = await apiClient.post<unknown>('/int/v1/users/', {
       name: input.name,
       email: input.email,
+      role: input.role,
       ...(input.password ? { password: input.password } : {}),
     });
     return mapUser((normalizeSingle<UnknownRecord>(payload, ['user']) ?? {}) as UnknownRecord);
@@ -55,6 +59,7 @@ class UsersService {
       ...(input.name !== undefined ? { name: input.name } : {}),
       ...(input.email !== undefined ? { email: input.email } : {}),
       ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(input.role !== undefined ? { role: input.role } : {}),
     });
     return mapUser((normalizeSingle<UnknownRecord>(payload, ['user']) ?? {}) as UnknownRecord);
   }

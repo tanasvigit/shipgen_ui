@@ -28,7 +28,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.ADMIN]: 'full',
       [UserRole.OPERATIONS_MANAGER]: 'full',
       [UserRole.DISPATCHER]: 'full',
-      [UserRole.DRIVER]: 'read-only',
+      [UserRole.DRIVER]: 'none',
       [UserRole.VIEWER]: 'read-only',
     },
   },
@@ -58,7 +58,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.ADMIN]: 'full',
       [UserRole.OPERATIONS_MANAGER]: 'full',
       [UserRole.DISPATCHER]: 'read-only',
-      [UserRole.DRIVER]: 'read-only',
+      [UserRole.DRIVER]: 'none',
       [UserRole.VIEWER]: 'read-only',
     },
   },
@@ -88,7 +88,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.ADMIN]: 'full',
       [UserRole.OPERATIONS_MANAGER]: 'full',
       [UserRole.DISPATCHER]: 'full',
-      [UserRole.DRIVER]: 'read-only',
+      [UserRole.DRIVER]: 'none',
       [UserRole.VIEWER]: 'read-only',
     },
   },
@@ -170,6 +170,14 @@ export function canDeleteCustomers(role: UserRole): boolean {
 
 export function canAccessRoute(role: UserRole, path: string): boolean {
   const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
+
+  if (role === UserRole.DRIVER) {
+    // Driver UI is intentionally minimal: assigned orders + profile only.
+    if (normalizedPath === 'profile') return true;
+    if (normalizedPath === 'logistics/orders' || normalizedPath.startsWith('logistics/orders/')) return true;
+    if (normalizedPath === 'logistics') return true;
+    return false;
+  }
 
   if (normalizedPath === 'analytics/users' || normalizedPath.startsWith('analytics/users/')) {
     return role === UserRole.ADMIN;

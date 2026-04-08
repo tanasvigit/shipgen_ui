@@ -353,7 +353,7 @@ def complete_order(
 def cancel_order(
     order_id: str,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     order = _get_scoped_order(db, current, order_id)
     order.status = "cancelled"

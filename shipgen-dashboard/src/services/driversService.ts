@@ -122,7 +122,7 @@ class DriversService {
 
   async update(
     id: string,
-    input: { drivers_license_number?: string; status?: string; online?: number },
+    input: { user_uuid?: string | null; drivers_license_number?: string; status?: string; online?: number },
   ): Promise<UiDriver> {
     const payload = await apiClient.patch<unknown>(`${DRIVERS_BASE_PATH}/${id}`, input);
     return mapBackendDriverToUi((normalizeSingle<BackendDriver>(payload, ['driver']) ?? {}) as BackendDriver);

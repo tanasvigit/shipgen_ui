@@ -13,7 +13,8 @@ class UserBase(BaseModel):
     public_id: Optional[str] = None
     name: Optional[str] = None
     username: Optional[str] = None
-    email: Optional[EmailStr] = None
+    # Keep response permissive to avoid breaking on legacy/demo addresses (e.g. *.local).
+    email: Optional[str] = None
     phone: Optional[str] = None
     country: Optional[str] = None
     timezone: Optional[str] = None
@@ -33,6 +34,7 @@ class UserBase(BaseModel):
     last_seen_at: Optional[datetime] = None
     last_login: Optional[datetime | str] = None
     status: Optional[str] = None
+    role: Optional[LogisticsRole] = None
     slug: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -46,7 +48,7 @@ class UserCreate(BaseModel):
     company_uuid: Optional[str] = None
     timezone: Optional[str] = None
     country: Optional[str] = None
-    role: Optional[LogisticsRole] = None
+    role: LogisticsRole
 
 
 class UserUpdate(BaseModel):

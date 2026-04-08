@@ -510,6 +510,7 @@ const App: React.FC = () => {
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const roleFallbackPath = currentUser?.role === UserRole.DRIVER ? '/logistics/orders' : '/dashboard';
 
   useEffect(() => {
     if (APP_MODE.disableAuth) {
@@ -628,7 +629,7 @@ const App: React.FC = () => {
           <Route
             path="/dashboard"
             element={
-              <RoleGuard userRole={currentUser?.role || null} fallbackPath="/dashboard">
+              <RoleGuard userRole={currentUser?.role || null} fallbackPath={roleFallbackPath}>
                 <DashboardWrapper />
               </RoleGuard>
             }
@@ -639,7 +640,7 @@ const App: React.FC = () => {
           <Route
             path="/logistics"
             element={
-              <RoleGuard userRole={currentUser?.role || null} fallbackPath="/dashboard">
+              <RoleGuard userRole={currentUser?.role || null} fallbackPath={roleFallbackPath}>
                 <LogisticsLayout />
               </RoleGuard>
             }
@@ -659,7 +660,7 @@ const App: React.FC = () => {
           <Route
             path="/fleet"
             element={
-              <RoleGuard userRole={currentUser?.role || null} fallbackPath="/dashboard">
+              <RoleGuard userRole={currentUser?.role || null} fallbackPath={roleFallbackPath}>
                 <FleetWrapper />
               </RoleGuard>
             }
@@ -694,7 +695,7 @@ const App: React.FC = () => {
           <Route
             path="/warehouse"
             element={
-              <RoleGuard userRole={currentUser?.role || null} fallbackPath="/dashboard">
+              <RoleGuard userRole={currentUser?.role || null} fallbackPath={roleFallbackPath}>
                 <WarehouseWrapper />
               </RoleGuard>
             }
@@ -709,7 +710,7 @@ const App: React.FC = () => {
           <Route
             path="/billing"
             element={
-              <RoleGuard userRole={currentUser?.role || null} fallbackPath="/dashboard">
+              <RoleGuard userRole={currentUser?.role || null} fallbackPath={roleFallbackPath}>
                 <BillingWrapper />
               </RoleGuard>
             }
@@ -725,7 +726,7 @@ const App: React.FC = () => {
           <Route
             path="/analytics"
             element={
-              <RoleGuard userRole={currentUser?.role || null} fallbackPath="/dashboard">
+              <RoleGuard userRole={currentUser?.role || null} fallbackPath={roleFallbackPath}>
                 <ReportsWrapper />
               </RoleGuard>
             }
@@ -755,14 +756,13 @@ const App: React.FC = () => {
                 <RoleGuard
                   userRole={currentUser?.role ?? null}
                   requiredRole={[UserRole.ADMIN]}
-                  fallbackPath="/dashboard"
+                  fallbackPath={roleFallbackPath}
                 >
                   <UsersList />
                 </RoleGuard>
               }
             />
             <Route path="comments" element={<CommentsList />} />
-            <Route path="profile" element={<Profile />} />
             <Route path="extensions" element={<ExtensionsList />} />
             <Route path="groups" element={<GroupsList />} />
             <Route path="notifications" element={<NotificationsList />} />
@@ -779,11 +779,14 @@ const App: React.FC = () => {
           <Route
             path="/ai-assistant"
             element={
-              <RoleGuard userRole={currentUser?.role || null} fallbackPath="/dashboard">
+              <RoleGuard userRole={currentUser?.role || null} fallbackPath={roleFallbackPath}>
                 <AIAssistant />
               </RoleGuard>
             }
           />
+
+          {/* Profile is self-service for all authenticated users */}
+          <Route path="/profile" element={<Profile />} />
 
           {/* /app aliases for real app modules (for redirect from public demo & login) */}
           <Route path="/app/dashboard" element={<Navigate to="/dashboard" replace />} />

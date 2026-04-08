@@ -113,6 +113,11 @@ const UsersList: React.FC = () => {
                   render: (row) => <span className="text-sm text-gray-700 table-cell-ellipsis block" title={row.email || '—'}>{row.email || '—'}</span>,
                 },
                 {
+                  key: 'role',
+                  header: 'role',
+                  render: (row) => <span className="text-sm text-gray-700">{row.role || '—'}</span>,
+                },
+                {
                   key: 'status',
                   header: 'status',
                   render: (row) => <span className="text-sm text-gray-700">{row.status || '—'}</span>,

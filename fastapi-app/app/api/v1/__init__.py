@@ -6,6 +6,7 @@ from app.api.v1.routers import (
     companies,
     fleetops_orders,
     fleetops_order_flow,
+    driver_portal,
     fleetops_drivers,
     fleetops_vehicles,
     roles,
@@ -108,6 +109,7 @@ router.include_router(users.router)
 router.include_router(companies.router)
 router.include_router(fleetops_orders.router)
 router.include_router(fleetops_order_flow.router)
+router.include_router(driver_portal.router)
 router.include_router(fleetops_drivers.router)
 router.include_router(fleetops_vehicles.router)
 router.include_router(roles.router)

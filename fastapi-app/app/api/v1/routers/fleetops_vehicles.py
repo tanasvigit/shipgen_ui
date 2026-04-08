@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.routers.auth import _get_current_user
 from app.core.company_scope import require_company_uuid
 from app.core.database import get_db
+from app.core.roles import ADMIN, DISPATCHER, OPERATIONS_MANAGER, require_roles
 from app.models.driver import Driver
 from app.models.order import Order
 from app.models.user import User
@@ -110,7 +111,7 @@ def get_vehicle(
 def create_vehicle(
     payload: VehicleCreate,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     company_uuid = require_company_uuid(current)
     vehicle = Vehicle()
@@ -140,7 +141,7 @@ def update_vehicle(
     vehicle_id: str,
     payload: VehicleUpdate,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     company_uuid = require_company_uuid(current)
     vehicle = _get_vehicle_for_company(db, company_uuid=company_uuid, vehicle_id=vehicle_id)
@@ -161,7 +162,7 @@ def update_vehicle(
 def delete_vehicle(
     vehicle_id: str,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     company_uuid = require_company_uuid(current)
     vehicle = _get_vehicle_for_company(db, company_uuid=company_uuid, vehicle_id=vehicle_id)
@@ -185,7 +186,7 @@ def track_vehicle(
     heading: float | None = None,
     speed: float | None = None,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     company_uuid = require_company_uuid(current)
     vehicle = _get_vehicle_for_company(db, company_uuid=company_uuid, vehicle_id=vehicle_id)
@@ -215,7 +216,7 @@ def assign_driver(
     vehicle_id: str,
     driver_uuid: str,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     """Assign a driver to this vehicle by setting driver.vehicle_uuid only."""
     company_uuid = require_company_uuid(current)
@@ -240,7 +241,7 @@ def assign_driver_spec_alias(
     vehicle_id: str,
     driver_uuid: str,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     """POST /vehicles/{vehicle_id}/assgn-driver – spec path (typo); same as assign-driver."""
     return assign_driver(vehicle_id, driver_uuid, db, current)

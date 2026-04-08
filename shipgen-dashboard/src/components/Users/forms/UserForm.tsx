@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { usersService } from '../../../services/usersService';
 import { PH } from '../../../constants/formPlaceholders';
-import { FormActions, FormContainer, FormField, FormSection, Input } from '../../common/form';
+import { FormActions, FormContainer, FormField, FormSection, Input, Select } from '../../common/form';
 
 interface UserFormProps {
   mode: 'create' | 'edit';
@@ -19,6 +19,7 @@ const UserForm: React.FC<UserFormProps> = ({ mode, userId, onSuccess, onCancel }
     name: '',
     email: '',
     password: '',
+    role: '',
     status: '',
   });
 
@@ -33,6 +34,7 @@ const UserForm: React.FC<UserFormProps> = ({ mode, userId, onSuccess, onCancel }
           name: row.name || '',
           email: row.email || '',
           password: '',
+          role: row.role || '',
           status: row.status || '',
         });
       } catch (err: unknown) {
@@ -58,6 +60,10 @@ const UserForm: React.FC<UserFormProps> = ({ mode, userId, onSuccess, onCancel }
       setError('Password is required');
       return;
     }
+    if (!form.role.trim()) {
+      setError('Role is required');
+      return;
+    }
     try {
       setSaving(true);
       setError(null);
@@ -65,6 +71,7 @@ const UserForm: React.FC<UserFormProps> = ({ mode, userId, onSuccess, onCancel }
         await usersService.update(userId, {
           name: form.name.trim(),
           email: form.email.trim(),
+          role: form.role.trim() as 'ADMIN' | 'OPERATIONS_MANAGER' | 'DISPATCHER' | 'DRIVER' | 'VIEWER',
           status: form.status.trim() || undefined,
         });
       } else {
@@ -72,6 +79,7 @@ const UserForm: React.FC<UserFormProps> = ({ mode, userId, onSuccess, onCancel }
           name: form.name.trim(),
           email: form.email.trim(),
           password: form.password,
+          role: form.role.trim() as 'ADMIN' | 'OPERATIONS_MANAGER' | 'DISPATCHER' | 'DRIVER' | 'VIEWER',
         });
       }
       await onSuccess();
@@ -117,6 +125,22 @@ const UserForm: React.FC<UserFormProps> = ({ mode, userId, onSuccess, onCancel }
               onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
               placeholder={PH.email}
             />
+          </FormField>
+          <FormField label="role" required htmlFor="user-role">
+            <Select
+              id="user-role"
+              value={form.role}
+              onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
+            >
+              <option value="" disabled>
+                Select role
+              </option>
+              <option value="ADMIN">ADMIN</option>
+              <option value="OPERATIONS_MANAGER">OPERATIONS_MANAGER</option>
+              <option value="DISPATCHER">DISPATCHER</option>
+              <option value="DRIVER">DRIVER</option>
+              <option value="VIEWER">VIEWER</option>
+            </Select>
           </FormField>
           {mode === 'create' ? (
             <FormField className="md:col-span-2" label="password" required htmlFor="user-password">

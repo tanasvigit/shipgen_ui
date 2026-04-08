@@ -48,6 +48,7 @@ class DriverCreate(BaseModel):
 
 
 class DriverUpdate(BaseModel):
+    user_uuid: Optional[str] = None
     drivers_license_number: Optional[str] = None
     status: Optional[str] = None
     online: Optional[int] = None

@@ -1,4 +1,4 @@
-#!D:\shipgen_ui\fastapi-app\venv\Scripts\python.exe
+#!D:\_new_code_logistics\_new_code_logistics\fastapi-app\venv\Scripts\python.exe
 
 import sys
 import json

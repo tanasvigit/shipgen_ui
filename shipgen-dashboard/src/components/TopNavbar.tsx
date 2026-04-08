@@ -113,7 +113,7 @@ const TopNavbar: React.FC<TopNavbarProps> = ({ onToggleSidebar, user, onLogout }
                   className="justify-start"
                   role="menuitem"
                   onClick={() => {
-                    navigate('/analytics/profile');
+                    navigate('/profile');
                     setIsUserMenuOpen(false);
                   }}
                 >

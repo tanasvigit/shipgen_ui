@@ -34,12 +34,14 @@ const RoleGuard: React.FC<RoleGuardProps> = ({
 
   // If specific roles are required, check them
   if (requiredRole && !requiredRole.includes(userRole)) {
-    return <Navigate to={fallbackPath || '/dashboard'} replace />;
+    const resolvedFallback = fallbackPath || (userRole === UserRole.DRIVER ? '/logistics/orders' : '/dashboard');
+    return <Navigate to={resolvedFallback} replace />;
   }
 
   // Check route access using roleAccess utility
   if (!canAccessRoute(userRole, location.pathname)) {
-    return <Navigate to={fallbackPath || '/dashboard'} replace />;
+    const resolvedFallback = fallbackPath || (userRole === UserRole.DRIVER ? '/logistics/orders' : '/dashboard');
+    return <Navigate to={resolvedFallback} replace />;
   }
 
   return children;
