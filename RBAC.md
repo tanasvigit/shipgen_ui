@@ -13,7 +13,7 @@ Five fixed string roles (stored on the user, enforced on the API, mirrored in th
 | `ADMIN` | Full access, including user management and destructive actions. |
 | `OPERATIONS_MANAGER` | Operations: orders, assignment, transitions, customers; **no** user admin. |
 | `DISPATCHER` | Create/update orders, assign, transition status, manage customer records; **no** user admin; **no** soft-delete of orders (admin only). |
-| `DRIVER` | **Only** orders assigned to their driver profile; **one-step forward** status transitions only; **no** contacts/customers API; **no** assign/dispatch/exceptions. |
+| `DRIVER` | **Only** assigned orders + profile in UI; one-step forward transitions only; no users/contacts/customers/fleet/system modules. |
 | `VIEWER` | Read-only: no mutating fleetops order/contact endpoints (except where explicitly allowed as GET). |
 
 **Default when missing or invalid:** `DISPATCHER` (see `effective_user_role()` below).
@@ -40,9 +40,12 @@ Do **not** duplicate role literals across the codebase; import from `app.core.ro
 
 ## 3. Database
 
-- **Column:** `users.role` — nullable `String(64)` (see model `app/models/user.py`).
-- **Migration:** `fastapi-app/alembic/versions/0017_user_role_rbac.py`  
-  - Apply with: `alembic upgrade head` (from `fastapi-app/`).
+- **Columns:** `users.role` (`String(64)`), `users.uuid`, `users.public_id`.
+- **Migrations:**
+  - `0017_user_role_rbac.py` (adds `users.role`)
+  - `0018_backfill_user_uuid_values.py` (backfills missing `users.uuid` / `users.public_id`)
+  - `0019_unique_driver_user_link.py` (unique index `drivers(company_uuid, user_uuid)`)
+- Apply with: `alembic upgrade head` (from `fastapi-app/`).
 
 **Existing rows:** `NULL` or invalid values behave as **DISPATCHER** until you set a proper role, e.g.:
 
@@ -63,8 +66,19 @@ UPDATE users SET role = 'ADMIN' WHERE email = 'your-admin@example.com';
 
 | Action | Roles |
 |--------|--------|
-| `GET /` (list), `GET /{id}`, `POST /`, `PUT\|PATCH /{id}`, `DELETE /{id}` | **ADMIN** only (list scoped by `current_user.company_uuid` when set). |
+| `GET /` (list), `GET /{uuid}`, `POST /`, `PUT\|PATCH /{uuid}`, `DELETE /{uuid}` | **ADMIN** only (list scoped by `current_user.company_uuid` when set). |
 | `GET /me` (or equivalent current-user route), password / 2FA / locale helpers | Authenticated user (not restricted to admin). |
+
+**Identifier rule (important):**
+- User CRUD path params are **UUID-only**.
+- Numeric IDs are rejected with **422** (`user_id must be a valid UUID`).
+- User create always assigns `users.uuid` + `users.public_id`.
+
+**Auto driver provisioning:**
+- On user create/update, if effective role becomes `DRIVER`, backend auto-creates linked driver row if missing:
+  - `drivers.user_uuid = users.uuid`
+  - `drivers.company_uuid = users.company_uuid`
+- If role changes from `DRIVER` to non-driver, linked driver is set inactive (`status="inactive"`, `online=0`).
 
 ### 4.3 Fleetops contacts / customers (`/fleetops/v1/contacts`)
 
@@ -84,6 +98,17 @@ UPDATE users SET role = 'ADMIN' WHERE email = 'your-admin@example.com';
 | `POST /` (create), `PUT\|PATCH /{id}` | **ADMIN**, **OPERATIONS_MANAGER**, **DISPATCHER** |
 | `DELETE /{id}`, `DELETE /{id}/delete` | **ADMIN** only |
 | `POST` start, complete, `DELETE` cancel, schedule, dispatch | **ADMIN**, **OPERATIONS_MANAGER**, **DISPATCHER** (not **DRIVER** / **VIEWER**) |
+
+### 4.6 Fleetops drivers (`/fleetops/v1/drivers`)
+
+| Action | Roles |
+|--------|--------|
+| `GET` list/detail | Authenticated roles per current router behavior |
+| `POST`, `PATCH`, `DELETE`, track/toggle/switch/register mutations | **ADMIN**, **OPERATIONS_MANAGER**, **DISPATCHER** |
+
+**Link consistency:**
+- Drivers API now prevents duplicate active links for same `(company_uuid, user_uuid)` and returns **409** on conflict.
+- DB unique index also enforces this at persistence layer.
 
 ### 4.5 Order flow (same prefix, separate router)
 
@@ -122,8 +147,8 @@ UPDATE users SET role = 'ADMIN' WHERE email = 'your-admin@example.com';
 - **`SECTION_ACCESS`** — coarse nav sections (dashboard, logistics, fleet, …) per role.
 - **`canAccessRoute(role, path)`** — pathname rules, including:
   - `/analytics/users` → **ADMIN** only
-  - `/logistics/customers` → not **DRIVER**
-  - `/logistics/orders/dispatch-board` → not **DRIVER** or **VIEWER**
+  - **For DRIVER:** allow only `/logistics/orders`, `/logistics/orders/*`, `/profile` (and `/logistics` redirect path)
+  - everything else for DRIVER is denied
 - **`getStoredUserRole()`** — reads `localStorage.user.role` and normalizes.
 - Small helpers: `canCreateOrders`, `canEditOrders`, `canDeleteOrders`, `canMutateCustomers`, `canDeleteCustomers`, `canAssignOrDispatchOrders`, `canManageUsers`, etc.
 
@@ -134,6 +159,9 @@ UPDATE users SET role = 'ADMIN' WHERE email = 'your-admin@example.com';
 **`RoleGuard`** — optional **`requiredRole`** array; always combines with **`canAccessRoute`**.
 
 Example: **`/analytics/users`** is wrapped with **`requiredRole={[UserRole.ADMIN]}`** in `App.tsx`.
+
+Driver fallback behavior:
+- denied driver routes redirect to `/logistics/orders` (not `/dashboard`).
 
 ### 6.4 UI patterns
 
@@ -178,11 +206,12 @@ Example: **`/analytics/users`** is wrapped with **`requiredRole={[UserRole.ADMIN
 |------|------|
 | Role constants & dependency | `fastapi-app/app/core/roles.py` |
 | User model field | `fastapi-app/app/models/user.py` |
-| Migration | `fastapi-app/alembic/versions/0017_user_role_rbac.py` |
+| Migrations | `fastapi-app/alembic/versions/0017_user_role_rbac.py`, `0018_backfill_user_uuid_values.py`, `0019_unique_driver_user_link.py` |
 | Orders + scoping | `fastapi-app/app/api/v1/routers/fleetops_orders.py` |
 | Assign / transition / exceptions | `fastapi-app/app/api/v1/routers/fleetops_order_flow.py` |
+| Driver auto-provision + UUID user CRUD | `fastapi-app/app/api/v1/routers/users.py` |
+| Driver duplicate-link guard | `fastapi-app/app/api/v1/routers/fleetops_drivers.py` |
 | Contacts | `fastapi-app/app/api/v1/routers/fleetops_contacts.py` |
-| Users CRUD | `fastapi-app/app/api/v1/routers/users.py` |
 | Login / Me payload | `fastapi-app/app/api/v1/routers/auth.py`, `me.py` |
 | Frontend types | `shipgen-dashboard/src/types.ts` |
 | Frontend matrix & routes | `shipgen-dashboard/src/utils/roleAccess.ts` |
