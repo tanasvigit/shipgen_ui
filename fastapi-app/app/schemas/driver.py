@@ -36,6 +36,7 @@ class DriverBase(BaseModel):
     online: Optional[int] = None
     status: Optional[str] = None
     slug: Optional[str] = None
+    last_seen_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

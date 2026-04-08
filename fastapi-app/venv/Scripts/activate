@@ -35,7 +35,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="D:\_new_code_logistics\_new_code_logistics\fastapi-app\venv"
+VIRTUAL_ENV="W:\projects\shipgen_ui\fastapi-app\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

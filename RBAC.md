@@ -14,9 +14,51 @@ Five fixed string roles (stored on the user, enforced on the API, mirrored in th
 | `OPERATIONS_MANAGER` | Operations: orders, assignment, transitions, customers; **no** user admin. |
 | `DISPATCHER` | Create/update orders, assign, transition status, manage customer records; **no** user admin; **no** soft-delete of orders (admin only). |
 | `DRIVER` | **Only** assigned orders + profile in UI; one-step forward transitions only; no users/contacts/customers/fleet/system modules. |
-| `VIEWER` | Read-only: no mutating fleetops order/contact endpoints (except where explicitly allowed as GET). |
+| `VIEWER` | **Internal read-only role** for stakeholders (management, finance, support). Can view all data but cannot modify anything. **NOT an external customer** — external customers use the Storefront system. |
+
+**Important:** `VIEWER` is an **INTERNAL read-only role** for staff/stakeholders who need visibility without modification rights. It is **NOT** for external customers. External customers should use the Storefront module with separate authentication.
 
 **Default when missing or invalid:** `DISPATCHER` (see `effective_user_role()` below).
+
+### 1.1 VIEWER Role Details
+
+**VIEWER = "See everything, change nothing"** (internal user only)
+
+**Purpose:** Internal read-only access for stakeholders who need visibility into operations without modification rights.
+
+**Typical Users:**
+- Upper management (CEO, VP Operations)
+- Finance team members
+- Support staff
+- Warehouse staff (read-only)
+- Auditors
+- B2B partners (if given dashboard access)
+
+**Access Level:**
+- ✅ **CAN:** View all orders, drivers, vehicles, customers, analytics, reports
+- ✅ **CAN:** Access dashboard metrics and charts
+- ✅ **CAN:** Use AI Assistant (read-only queries)
+- ❌ **CANNOT:** Create, update, or delete any records
+- ❌ **CANNOT:** Transition order status
+- ❌ **CANNOT:** Assign drivers or vehicles
+- ❌ **CANNOT:** Access user management
+
+**Backend Enforcement:**
+- All mutation endpoints (POST/PUT/PATCH/DELETE) return 403 Forbidden
+- Explicitly blocked in `fleetops_order_flow.py` (line 279-280)
+- Only GET endpoints are accessible
+
+**Frontend Behavior:**
+- All modules visible but read-only
+- Create/Edit/Delete buttons are hidden
+- Action-heavy routes blocked (`/create`, `/edit`, `/dispatch-board`)
+- Role displayed as "Viewer (Read-only)" in UI
+
+**NOT for External Customers:**
+- VIEWER is an **internal** role only
+- External customers should use the **Storefront** module
+- Storefront has separate authentication and customer management
+- Legacy mapping `CUSTOMER: UserRole.VIEWER` has been removed to avoid confusion
 
 ---
 
@@ -121,6 +163,24 @@ UPDATE users SET role = 'ADMIN' WHERE email = 'your-admin@example.com';
   - **VIEWER** → 403
   - **DRIVER** → only **single forward** step on the main lifecycle list; no terminal/special statuses; must be assigned driver on the order
   - **ADMIN**, **OPERATIONS_MANAGER**, **DISPATCHER** → existing transition validation (forward / allowed specials as implemented)
+
+### 4.7 Transactions (`/int/v1/transactions`)
+
+| Action | Roles |
+|--------|--------|
+| `GET` list/detail | All authenticated roles |
+| `POST /` (create), `PUT/PATCH /{id}` (update), `DELETE /{id}` | **ADMIN**, **OPERATIONS_MANAGER**, **DISPATCHER** |
+
+**Note:** VIEWER role is explicitly blocked from all transaction mutations.
+
+### 4.8 Telematics (`/int/v1/telematics`)
+
+| Action | Roles |
+|--------|--------|
+| `GET` list/detail | All authenticated roles |
+| `POST /` (create), `PUT /{id}` (update), `POST /{id}/heartbeat`, `DELETE /{id}` | **ADMIN**, **OPERATIONS_MANAGER**, **DISPATCHER** |
+
+**Note:** VIEWER role is explicitly blocked from all telematics mutations.
 
 ---
 

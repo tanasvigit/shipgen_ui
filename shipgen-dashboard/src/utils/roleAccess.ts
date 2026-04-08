@@ -29,7 +29,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.OPERATIONS_MANAGER]: 'full',
       [UserRole.DISPATCHER]: 'full',
       [UserRole.DRIVER]: 'none',
-      [UserRole.VIEWER]: 'read-only',
+      [UserRole.VIEWER]: 'read-only', // VIEWER can access Dashboard
     },
   },
   {
@@ -39,7 +39,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.OPERATIONS_MANAGER]: 'full',
       [UserRole.DISPATCHER]: 'full',
       [UserRole.DRIVER]: 'limited',
-      [UserRole.VIEWER]: 'read-only',
+      [UserRole.VIEWER]: 'read-only', // VIEWER can access Orders & Customers
     },
   },
   {
@@ -49,7 +49,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.OPERATIONS_MANAGER]: 'full',
       [UserRole.DISPATCHER]: 'none',
       [UserRole.DRIVER]: 'none',
-      [UserRole.VIEWER]: 'read-only',
+      [UserRole.VIEWER]: 'none', // VIEWER cannot access Warehouse
     },
   },
   {
@@ -59,7 +59,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.OPERATIONS_MANAGER]: 'full',
       [UserRole.DISPATCHER]: 'read-only',
       [UserRole.DRIVER]: 'none',
-      [UserRole.VIEWER]: 'read-only',
+      [UserRole.VIEWER]: 'read-only', // VIEWER can access Drivers, Vehicles, Fleet Dashboard
     },
   },
   {
@@ -69,7 +69,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.OPERATIONS_MANAGER]: 'read-only',
       [UserRole.DISPATCHER]: 'none',
       [UserRole.DRIVER]: 'none',
-      [UserRole.VIEWER]: 'read-only',
+      [UserRole.VIEWER]: 'none', // VIEWER: hidden for now, will add later
     },
   },
   {
@@ -79,7 +79,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.OPERATIONS_MANAGER]: 'full',
       [UserRole.DISPATCHER]: 'read-only',
       [UserRole.DRIVER]: 'none',
-      [UserRole.VIEWER]: 'read-only',
+      [UserRole.VIEWER]: 'none', // VIEWER: hidden for now, will add later
     },
   },
   {
@@ -89,7 +89,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.OPERATIONS_MANAGER]: 'full',
       [UserRole.DISPATCHER]: 'full',
       [UserRole.DRIVER]: 'none',
-      [UserRole.VIEWER]: 'read-only',
+      [UserRole.VIEWER]: 'none', // VIEWER cannot access AI Assistant
     },
   },
 ];
@@ -183,19 +183,19 @@ export function canAccessRoute(role: UserRole, path: string): boolean {
     return role === UserRole.ADMIN;
   }
 
-  if (normalizedPath === 'logistics/customers' || normalizedPath.startsWith('logistics/customers/')) {
-    if (role === UserRole.DRIVER) return false;
-  }
+  // Note: DRIVER role is handled early (lines 174-180), so remaining code only handles other roles
 
   if (
     normalizedPath === 'logistics/orders/dispatch-board' ||
     normalizedPath.startsWith('logistics/orders/dispatch-board')
   ) {
-    if (role === UserRole.DRIVER || role === UserRole.VIEWER) return false;
+    // DRIVER already handled above, only need to check VIEWER
+    if (role === UserRole.VIEWER) return false;
   }
 
   if (normalizedPath.includes('/orders/create') || normalizedPath.endsWith('orders/create')) {
-    if (role === UserRole.VIEWER || role === UserRole.DRIVER) return false;
+    // DRIVER already handled above, only need to check VIEWER
+    if (role === UserRole.VIEWER) return false;
   }
 
   const pathParts = normalizedPath.split('/');
@@ -207,17 +207,8 @@ export function canAccessRoute(role: UserRole, path: string): boolean {
 
   const accessLevel = canAccess(role, sectionId);
 
-  if (role === UserRole.DRIVER && sectionId === 'logistics') {
-    if (pathParts.includes('create') || pathParts.includes('edit') || pathParts.includes('assign')) {
-      return false;
-    }
-  }
-
-  if (role === UserRole.DRIVER && sectionId === 'fleet') {
-    if (pathParts.includes('create') || pathParts.includes('edit')) {
-      return false;
-    }
-  }
+  // DRIVER already handled at the start of this function
+  // These checks are now unreachable but kept for documentation
 
   if (role === UserRole.OPERATIONS_MANAGER && sectionId === 'billing') {
     if (pathParts.includes('generate') || pathParts.includes('record')) {
@@ -232,4 +223,27 @@ export function canAccessRoute(role: UserRole, path: string): boolean {
   }
 
   return true;
+}
+
+/**
+ * Get a user-friendly display label for a role.
+ * VIEWER is labeled as "Viewer (Read-only)" to clarify it's an internal role, not a customer.
+ */
+export function getRoleDisplayLabel(role: UserRole | string): string {
+  const normalized = normalizeUserRole(role);
+  
+  switch (normalized) {
+    case UserRole.ADMIN:
+      return 'Admin';
+    case UserRole.OPERATIONS_MANAGER:
+      return 'Operations Manager';
+    case UserRole.DISPATCHER:
+      return 'Dispatcher';
+    case UserRole.DRIVER:
+      return 'Driver';
+    case UserRole.VIEWER:
+      return 'Viewer (Read-only)';
+    default:
+      return role as string;
+  }
 }

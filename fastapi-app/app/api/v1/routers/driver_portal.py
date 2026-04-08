@@ -202,3 +202,46 @@ def update_driver_location(
     db.commit()
     db.refresh(driver)
     return DriverResponse(driver=DriverOut.model_validate(driver))
+
+
+class DriverOnlineBody(BaseModel):
+    """Request body for setting driver online/offline status."""
+    online: Optional[int] = 1
+    status: Optional[str] = None
+
+
+@router.post("/online", response_model=DriverResponse)
+def set_driver_online(
+    payload: DriverOnlineBody,
+    db: Session = Depends(get_db),
+    current: User = Depends(require_roles(DRIVER)),
+):
+    """
+    Set driver online status after login.
+    
+    This endpoint should be called immediately after a DRIVER logs in
+    to mark them as available for order assignments.
+    
+    - Updates `online` field (1 = online, 0 = offline)
+    - Updates `status` to 'active' if provided
+    - Updates `last_seen_at` timestamp to current time
+    """
+    driver = _driver_for_current_user(db, current)
+    
+    # Update online status
+    if payload.online is not None:
+        if payload.online not in (0, 1):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="online must be 0 or 1")
+        driver.online = payload.online
+    
+    # Update status if provided
+    if payload.status is not None:
+        driver.status = payload.status
+    
+    # Always update last_seen_at timestamp
+    driver.last_seen_at = datetime.utcnow()
+    
+    db.add(driver)
+    db.commit()
+    db.refresh(driver)
+    return DriverResponse(driver=DriverOut.model_validate(driver))

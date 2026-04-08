@@ -31,6 +31,16 @@ const OrdersList: React.FC = () => {
   const mayEdit = canEditOrders(role);
   const mayDispatch = canAssignOrDispatchOrders(role);
 
+  // Track user ID to trigger refetch on login/logout
+  const [userKey, setUserKey] = useState(() => {
+    try {
+      const userStr = localStorage.getItem('user');
+      return userStr ? JSON.parse(userStr)?.id || '' : '';
+    } catch {
+      return '';
+    }
+  });
+
   const [orders, setOrders] = useState<UiOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +63,26 @@ const OrdersList: React.FC = () => {
 
   useEffect(() => {
     loadOrders();
-  }, [page, statusFilter, dateRange]);
+  }, [page, statusFilter, dateRange, userKey]); // Added userKey to refetch on login
+
+  // Detect user changes (login/logout) and refetch
+  useEffect(() => {
+    const checkUserChange = () => {
+      try {
+        const userStr = localStorage.getItem('user');
+        const currentUserId = userStr ? JSON.parse(userStr)?.id || '' : '';
+        if (currentUserId !== userKey) {
+          setUserKey(currentUserId);
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    // Check periodically for user changes
+    const interval = setInterval(checkUserChange, 1000);
+    return () => clearInterval(interval);
+  }, [userKey]);
 
   // Debounce search → backend.
   useEffect(() => {

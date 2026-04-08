@@ -518,14 +518,14 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (APP_MODE.disableAuth) {
       setCurrentUser(DEFAULT_MOCK_USER);
       return;
     }
 
     setCurrentUser(null);
-    logout();
+    await logout();
   };
 
   const ProtectedLayout: React.FC = () => (

@@ -4,16 +4,24 @@ export enum UserRole {
   OPERATIONS_MANAGER = 'OPERATIONS_MANAGER',
   DISPATCHER = 'DISPATCHER',
   DRIVER = 'DRIVER',
+  // VIEWER: Internal read-only role for stakeholders (NOT external customer)
   VIEWER = 'VIEWER',
 }
 
+/**
+ * Legacy role mapping for backward compatibility.
+ * Maps old/deprecated role names to current logistics roles.
+ * 
+ * Note: VIEWER is an INTERNAL read-only role, NOT an external customer.
+ * External customers should use the Storefront system with separate authentication.
+ */
 const LEGACY_ROLE_MAP: Record<string, UserRole> = {
   SUPER_ADMIN: UserRole.ADMIN,
   COMPANY_ADMIN: UserRole.ADMIN,
   OPERATIONS_MANAGER: UserRole.OPERATIONS_MANAGER,
-  WAREHOUSE_MANAGER: UserRole.VIEWER,
-  FINANCE: UserRole.VIEWER,
-  CUSTOMER: UserRole.VIEWER,
+  WAREHOUSE_MANAGER: UserRole.VIEWER,  // Internal warehouse staff (read-only)
+  FINANCE: UserRole.VIEWER,             // Internal finance team (read-only)
+  // CUSTOMER role removed - external customers use Storefront, not internal dashboard
   DRIVER: UserRole.DRIVER,
 };
 

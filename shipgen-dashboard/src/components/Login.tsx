@@ -3,7 +3,8 @@ import { Lock, Mail, ChevronRight, ShieldCheck, Eye, EyeOff } from 'lucide-react
 import Footer from './Footer';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { login } from '../services/auth';
-import { normalizeUserRole, type UserRole } from '../types';
+import { normalizeUserRole, UserRole } from '../types';
+import { driversService } from '../services/driversService';
 import { PH } from '../constants/formPlaceholders';
 
 interface LoginProps {
@@ -12,12 +13,12 @@ interface LoginProps {
 
 /** Matches `fastapi-app/scripts/seed_rbac_demo_users.py` — same password for all. */
 const DEMO_PASSWORD = 'RbacDemo123';
-const DEMO_ACCOUNTS: { role: string; email: string }[] = [
+const DEMO_ACCOUNTS: { role: string; email: string; displayLabel?: string }[] = [
   { role: 'ADMIN', email: 'admin@demo.local' },
   { role: 'OPERATIONS_MANAGER', email: 'operations@demo.local' },
   { role: 'DISPATCHER', email: 'dispatcher@demo.local' },
   { role: 'DRIVER', email: 'driver@demo.local' },
-  { role: 'VIEWER', email: 'viewer@demo.local' },
+  { role: 'VIEWER', email: 'viewer@demo.local', displayLabel: 'VIEWER (Read-only)' },
 ];
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -61,6 +62,17 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         companyId: 'default',
       };
       localStorage.setItem('user', JSON.stringify(appUser));
+      
+      // If user is a DRIVER, set them as online immediately after login
+      if (appUser.role === UserRole.DRIVER) {
+        try {
+          await driversService.setOnline(true, 'active');
+        } catch (err) {
+          // Log error but don't block login - driver can still use the app
+          console.error('Failed to set driver online status:', err);
+        }
+      }
+      
       onLogin(appUser);
       navigate(getRedirectPath(), { replace: true });
     } catch (err: unknown) {
@@ -168,9 +180,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               Demo accounts · password <span className="font-mono text-gray-600 normal-case">{DEMO_PASSWORD}</span>
             </p>
             <ul className="space-y-1.5 text-xs text-gray-600">
-              {DEMO_ACCOUNTS.map(({ role, email }) => (
+              {DEMO_ACCOUNTS.map(({ role, email, displayLabel }) => (
                 <li key={email} className="flex flex-wrap gap-x-2 gap-y-0.5">
-                  <span className="font-medium text-gray-700 min-w-[8.5rem]">{role}</span>
+                  <span className="font-medium text-gray-700 min-w-[8.5rem]">{displayLabel || role}</span>
                   <span className="font-mono text-gray-500">{email}</span>
                 </li>
               ))}

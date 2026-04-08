@@ -131,6 +131,18 @@ class DriversService {
   async remove(id: string): Promise<void> {
     await apiClient.delete(`${DRIVERS_BASE_PATH}/${id}`);
   }
+
+  /**
+   * Set driver online/offline status.
+   * Called after DRIVER login to mark them as available.
+   */
+  async setOnline(online: boolean, status?: string): Promise<UiDriver> {
+    const payload = await apiClient.post<unknown>('/driver/online', {
+      online: online ? 1 : 0,
+      status: status || 'active',
+    });
+    return mapBackendDriverToUi((normalizeSingle<BackendDriver>(payload, ['driver']) ?? {}) as BackendDriver);
+  }
 }
 
 export const driversService = new DriversService();

@@ -1,4 +1,6 @@
 import { apiClient } from './apiClient';
+import { UserRole, normalizeUserRole } from '../types';
+import { driversService } from './driversService';
 
 type LoginResponse = {
   token?: string;
@@ -21,7 +23,21 @@ export async function login(identity: string, password: string): Promise<LoginRe
   });
 }
 
-export function logout() {
+export async function logout() {
+  // If current user is a DRIVER, set them as offline before logging out
+  try {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      if (user && normalizeUserRole(user.role) === UserRole.DRIVER) {
+        await driversService.setOnline(false, 'inactive');
+      }
+    }
+  } catch (err) {
+    // Log error but don't block logout
+    console.error('Failed to set driver offline status:', err);
+  }
+  
   localStorage.removeItem('token');
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');

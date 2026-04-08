@@ -32,6 +32,7 @@ class Driver(Base):
     online: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[Optional[str]] = mapped_column(String(191), index=True)
     slug: Mapped[Optional[str]] = mapped_column(String(191), index=True)
+    last_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, index=True)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime)

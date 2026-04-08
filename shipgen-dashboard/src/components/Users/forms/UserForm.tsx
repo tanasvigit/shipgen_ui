@@ -139,7 +139,7 @@ const UserForm: React.FC<UserFormProps> = ({ mode, userId, onSuccess, onCancel }
               <option value="OPERATIONS_MANAGER">OPERATIONS_MANAGER</option>
               <option value="DISPATCHER">DISPATCHER</option>
               <option value="DRIVER">DRIVER</option>
-              <option value="VIEWER">VIEWER</option>
+              <option value="VIEWER">VIEWER (Read-only)</option>
             </Select>
           </FormField>
           {mode === 'create' ? (

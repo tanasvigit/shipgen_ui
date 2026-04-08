@@ -10,6 +10,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.roles import ADMIN, OPERATIONS_MANAGER, DISPATCHER, require_roles
 from app.models.telematic import Telematic
 from app.schemas.telematic import TelematicCreate, TelematicOut, TelematicUpdate, TelematicHeartbeat
 from app.api.v1.routers.auth import _get_current_user
@@ -88,7 +89,7 @@ def get_telematic(
 def create_telematic(
     payload: TelematicCreate,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    _current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     """Create a new telematic provider integration."""
     telematic_uuid = str(uuid.uuid4())
@@ -135,7 +136,7 @@ def update_telematic(
     telematic_id: str,
     payload: TelematicUpdate,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    _current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     """Update a telematic provider."""
     telematic = db.query(Telematic).filter(
@@ -171,7 +172,7 @@ def telematic_heartbeat(
     telematic_id: str,
     payload: TelematicHeartbeat,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    _current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     """Update telematic heartbeat/metrics."""
     telematic = db.query(Telematic).filter(
@@ -209,7 +210,7 @@ def telematic_heartbeat(
 def delete_telematic(
     telematic_id: str,
     db: Session = Depends(get_db),
-    _current: User = Depends(_get_current_user),
+    _current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     """Soft delete a telematic provider."""
     telematic = db.query(Telematic).filter(

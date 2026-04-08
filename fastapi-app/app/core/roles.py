@@ -1,4 +1,15 @@
-"""Fixed logistics RBAC role names and helpers."""
+"""Fixed logistics RBAC role names and helpers.
+
+Roles:
+- ADMIN: Full access including user management
+- OPERATIONS_MANAGER: Operations without user admin
+- DISPATCHER: Order management and dispatch
+- DRIVER: Assigned orders only
+- VIEWER: Internal read-only access (NOT external customers)
+
+Note: VIEWER is an internal role for stakeholders who need visibility.
+External customers should use the Storefront system.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +21,8 @@ ADMIN = "ADMIN"
 OPERATIONS_MANAGER = "OPERATIONS_MANAGER"
 DISPATCHER = "DISPATCHER"
 DRIVER = "DRIVER"
+# VIEWER: Internal read-only role for stakeholders (management, finance, support)
+# NOT for external customers - they use Storefront with separate auth
 VIEWER = "VIEWER"
 
 ALL_ROLES: frozenset[str] = frozenset({ADMIN, OPERATIONS_MANAGER, DISPATCHER, DRIVER, VIEWER})
@@ -39,3 +52,21 @@ def require_roles(*allowed_roles: str):
         return current
 
     return _dependency
+
+
+def deny_if_viewer(current: User) -> User:
+    """
+    FastAPI dependency: 403 if current user is VIEWER role.
+    
+    Use this as an additional guard on mutation endpoints to ensure
+    VIEWER (read-only) users cannot perform any modifications.
+    
+    Example:
+        current: User = Depends(deny_if_viewer)
+    """
+    if effective_user_role(current) == VIEWER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Read-only access: VIEWER role cannot perform mutations"
+        )
+    return current

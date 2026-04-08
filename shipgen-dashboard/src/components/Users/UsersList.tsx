@@ -115,7 +115,7 @@ const UsersList: React.FC = () => {
                 {
                   key: 'role',
                   header: 'role',
-                  render: (row) => <span className="text-sm text-gray-700">{row.role || '—'}</span>,
+                  render: (row) => <span className="text-sm text-gray-700">{row.role === 'VIEWER' ? 'Viewer (Read-only)' : (row.role || '—')}</span>,
                 },
                 {
                   key: 'status',

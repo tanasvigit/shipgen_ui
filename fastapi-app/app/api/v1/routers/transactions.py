@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.routers.auth import _get_current_user
 from app.core.database import get_db
+from app.core.roles import ADMIN, OPERATIONS_MANAGER, DISPATCHER, require_roles
 from app.models.transaction import Transaction
 from app.models.user import User
 
@@ -89,7 +90,7 @@ def get_transaction(
 def create_transaction(
     payload: TransactionCreate,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     transaction = Transaction()
     transaction.uuid = str(uuid.uuid4())
@@ -122,7 +123,7 @@ def update_transaction(
     id: str,
     payload: dict,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     base_query = db.query(Transaction).filter(
         Transaction.company_uuid == current.company_uuid,
@@ -149,7 +150,7 @@ def update_transaction(
 def delete_transaction(
     id: str,
     db: Session = Depends(get_db),
-    current: User = Depends(_get_current_user),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
 ):
     base_query = db.query(Transaction).filter(
         Transaction.company_uuid == current.company_uuid,
