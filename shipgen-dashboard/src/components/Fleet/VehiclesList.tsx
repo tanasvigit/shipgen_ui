@@ -9,10 +9,19 @@ import { PH, SELECT_PH } from '../../constants/formPlaceholders';
 import Modal from '../common/Modal';
 import RouteDetailsModal from '../common/RouteDetailsModal';
 import VehicleForm from './forms/VehicleForm';
+import {
+  canDeleteDriverVehicleMasterData,
+  canManageDriverVehicleMasterData,
+  getStoredUserRole,
+} from '../../utils/roleAccess';
+import { UserRole } from '../../types';
 
 const PAGE_SIZE = 20;
 
 const VehiclesList: React.FC = () => {
+  const role = getStoredUserRole() ?? UserRole.VIEWER;
+  const canManageMasterData = canManageDriverVehicleMasterData(role);
+  const canDeleteMasterData = canDeleteDriverVehicleMasterData(role);
   const location = useLocation();
   const initialParams = new URLSearchParams(location.search);
   const [searchTerm, setSearchTerm] = useState('');
@@ -72,8 +81,8 @@ const VehiclesList: React.FC = () => {
       <StandardCrudListLayout
         title="Vehicles"
         subtitle="Manage fleet vehicles"
-        createOnClick={() => setIsCreateOpen(true)}
-        createLabel="New Vehicle"
+        createOnClick={canManageMasterData ? () => setIsCreateOpen(true) : undefined}
+        createLabel={canManageMasterData ? 'New Vehicle' : undefined}
         filters={
           <div className="grid max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
             <select
@@ -114,7 +123,7 @@ const VehiclesList: React.FC = () => {
         emptyTitleNoMatch="No matching vehicles"
         emptyDescriptionNoData="Add vehicles to your fleet."
         emptyDescriptionNoMatch="Try a different search or status filter."
-        emptyAction={
+        emptyAction={canManageMasterData ? (
           <button
             type="button"
             onClick={() => setIsCreateOpen(true)}
@@ -122,7 +131,7 @@ const VehiclesList: React.FC = () => {
           >
             New vehicle
           </button>
-        }
+        ) : undefined}
         noMatchAction={
           <button
             type="button"
@@ -192,49 +201,59 @@ const VehiclesList: React.FC = () => {
                   >
                     <Eye size={16} />
                   </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedId(vehicle.id);
-                      setIsEditOpen(true);
-                    }}
-                    className="rounded-lg p-2 text-blue-600 transition hover:bg-blue-50"
-                  >
-                    <Edit size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void deleteWithConfirm(vehicle.id, (id) => vehiclesService.remove(id), {
-                        confirmMessage: 'Delete this vehicle?',
-                        successMessage: 'Vehicle deleted',
-                      });
-                    }}
-                    className="rounded-lg p-2 text-red-600 transition hover:bg-red-50"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {canManageMasterData ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedId(vehicle.id);
+                          setIsEditOpen(true);
+                        }}
+                        className="rounded-lg p-2 text-blue-600 transition hover:bg-blue-50"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      {canDeleteMasterData ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void deleteWithConfirm(vehicle.id, (id) => vehiclesService.remove(id), {
+                              confirmMessage: 'Delete this vehicle?',
+                              successMessage: 'Vehicle deleted',
+                            });
+                          }}
+                          className="rounded-lg p-2 text-red-600 transition hover:bg-red-50"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      ) : null}
+                    </>
+                  ) : null}
                 </div>
               ),
             },
           ]}
         />
       </StandardCrudListLayout>
-      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Create Vehicle">
-        <VehicleForm mode="create" onCancel={() => setIsCreateOpen(false)} onSuccess={async () => {
-          setIsCreateOpen(false);
-          await reload();
-        }} />
-      </Modal>
-      <Modal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit Vehicle">
-        <VehicleForm mode="edit" vehicleId={selectedId ?? undefined} onCancel={() => setIsEditOpen(false)} onSuccess={async () => {
-          setIsEditOpen(false);
-          setSelectedId(null);
-          await reload();
-        }} />
-      </Modal>
+      {canManageMasterData ? (
+        <>
+          <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Create Vehicle">
+            <VehicleForm mode="create" onCancel={() => setIsCreateOpen(false)} onSuccess={async () => {
+              setIsCreateOpen(false);
+              await reload();
+            }} />
+          </Modal>
+          <Modal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit Vehicle">
+            <VehicleForm mode="edit" vehicleId={selectedId ?? undefined} onCancel={() => setIsEditOpen(false)} onSuccess={async () => {
+              setIsEditOpen(false);
+              setSelectedId(null);
+              await reload();
+            }} />
+          </Modal>
+        </>
+      ) : null}
       <RouteDetailsModal
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
@@ -242,7 +261,7 @@ const VehiclesList: React.FC = () => {
         routePath={selectedId ? `/fleet/vehicles/${encodeURIComponent(selectedId)}` : null}
         headerTitle="Vehicle Details"
         headerSubtitle={selectedId ?? undefined}
-        onDelete={async () => {
+        onDelete={canDeleteMasterData ? async () => {
           if (!selectedId) return;
           await deleteWithConfirm(selectedId, (id) => vehiclesService.remove(id), {
             confirmMessage: 'Delete this vehicle?',
@@ -251,13 +270,13 @@ const VehiclesList: React.FC = () => {
           setIsDetailsOpen(false);
           setSelectedId(null);
           await reload();
-        }}
-        deleteLabel="Delete"
-        onEdit={() => {
+        } : undefined}
+        deleteLabel={canDeleteMasterData ? 'Delete' : undefined}
+        onEdit={canManageMasterData ? () => {
           setIsDetailsOpen(false);
           setIsEditOpen(true);
-        }}
-        editLabel="Edit Vehicle"
+        } : undefined}
+        editLabel={canManageMasterData ? 'Edit Vehicle' : undefined}
       />
 
       {listTotal > PAGE_SIZE && (

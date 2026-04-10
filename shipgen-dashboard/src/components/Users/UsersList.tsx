@@ -5,8 +5,15 @@ import { ResponsiveTable } from '../ui/ResponsiveTable';
 import { useToast } from '../ui/ToastProvider';
 import Modal from '../common/Modal';
 import UserForm from './forms/UserForm';
+import { canDeleteUsers, getStoredUserRole } from '../../utils/roleAccess';
+import { UserRole } from '../../types';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const UsersList: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const role = getStoredUserRole() ?? UserRole.VIEWER;
+  const mayDeleteUsers = canDeleteUsers(role);
   const { showToast } = useToast();
   const [rows, setRows] = useState<UiUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,6 +22,8 @@ const UsersList: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [createRole, setCreateRole] = useState<'ADMIN' | 'OPERATIONS_MANAGER' | 'DISPATCHER' | 'DRIVER' | 'VIEWER' | undefined>(undefined);
+  const [lockCreateRole, setLockCreateRole] = useState(false);
 
   const load = async () => {
     try {
@@ -32,6 +41,22 @@ const UsersList: React.FC = () => {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('create') !== '1') return;
+    const roleParam = (params.get('role') || '').toUpperCase();
+    const validRoles = new Set(['ADMIN', 'OPERATIONS_MANAGER', 'DISPATCHER', 'DRIVER', 'VIEWER']);
+    if (validRoles.has(roleParam)) {
+      setCreateRole(roleParam as 'ADMIN' | 'OPERATIONS_MANAGER' | 'DISPATCHER' | 'DRIVER' | 'VIEWER');
+      setLockCreateRole(true);
+    } else {
+      setCreateRole(undefined);
+      setLockCreateRole(false);
+    }
+    setIsCreateOpen(true);
+    navigate('/analytics/users', { replace: true });
+  }, [location.search, navigate]);
 
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -143,16 +168,18 @@ const UsersList: React.FC = () => {
                       >
                         <Edit size={16} />
                       </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void onDelete(row.id);
-                        }}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {mayDeleteUsers ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void onDelete(row.id);
+                          }}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      ) : null}
                     </div>
                   ),
                 },
@@ -165,9 +192,17 @@ const UsersList: React.FC = () => {
       <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Create User">
         <UserForm
           mode="create"
-          onCancel={() => setIsCreateOpen(false)}
+          initialRole={createRole}
+          lockRole={lockCreateRole}
+          onCancel={() => {
+            setIsCreateOpen(false);
+            setCreateRole(undefined);
+            setLockCreateRole(false);
+          }}
           onSuccess={async () => {
             setIsCreateOpen(false);
+            setCreateRole(undefined);
+            setLockCreateRole(false);
             showToast('User created successfully', 'success');
             await load();
           }}

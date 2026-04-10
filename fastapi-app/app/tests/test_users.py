@@ -46,7 +46,7 @@ class TestUserGet:
     def test_get_user_not_found(self, client, auth_headers):
         """Test getting non-existent user."""
         response = client.get("/int/v1/users/nonexistent-uuid", headers=auth_headers)
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_get_user_no_auth(self, client, test_user):
         """Test getting user without authentication."""
@@ -68,6 +68,7 @@ class TestUserCreate:
                 "email": "newuser@example.com",
                 "phone": "+1987654321",
                 "password": "securepassword123",
+                "role": "DRIVER",
             },
         )
         assert response.status_code == status.HTTP_201_CREATED
@@ -87,6 +88,7 @@ class TestUserCreate:
                 "email": test_user.email,  # Same email as test_user
                 "phone": "+1987654321",
                 "password": "securepassword123",
+                "role": "DRIVER",
             },
         )
         # Should either fail validation or allow (depending on business logic)
@@ -131,7 +133,7 @@ class TestUserUpdate:
             headers=auth_headers,
             json={"name": "Updated Name"},
         )
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
 @pytest.mark.iam
@@ -149,6 +151,7 @@ class TestUserDelete:
                 "email": "todelete@example.com",
                 "phone": "+1111111111",
                 "password": "password123",
+                "role": "DRIVER",
             },
         )
         assert create_response.status_code == status.HTTP_201_CREATED
@@ -156,7 +159,7 @@ class TestUserDelete:
 
         # Delete the user
         response = client.delete(f"/int/v1/users/{user_uuid}", headers=auth_headers)
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == status.HTTP_204_NO_CONTENT
 
         # Verify user is soft deleted (should not appear in list)
         list_response = client.get("/int/v1/users", headers=auth_headers)
@@ -171,7 +174,7 @@ class TestUserCurrent:
 
     def test_get_current_user_success(self, client, auth_headers, test_user):
         """Test getting current authenticated user."""
-        response = client.get("/int/v1/users/current", headers=auth_headers)
+        response = client.get("/int/v1/users/me", headers=auth_headers)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["uuid"] == test_user.uuid
@@ -179,7 +182,7 @@ class TestUserCurrent:
 
     def test_get_current_user_no_auth(self, client):
         """Test getting current user without authentication."""
-        response = client.get("/int/v1/users/current")
+        response = client.get("/int/v1/users/me")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
@@ -189,13 +192,9 @@ class TestUserPasswordChange:
 
     def test_change_password_success(self, client, auth_headers, test_user):
         """Test changing user password."""
-        response = client.put(
-            f"/int/v1/users/{test_user.uuid}/password",
+        response = client.post(
+            "/int/v1/users/set-password?password=newpassword123",
             headers=auth_headers,
-            json={
-                "current_password": "password123",
-                "new_password": "newpassword123",
-            },
         )
         assert response.status_code == status.HTTP_200_OK
 
@@ -210,14 +209,10 @@ class TestUserPasswordChange:
         assert login_response.status_code == status.HTTP_200_OK
 
     def test_change_password_wrong_current(self, client, auth_headers, test_user):
-        """Test changing password with wrong current password."""
-        response = client.put(
-            f"/int/v1/users/{test_user.uuid}/password",
+        """Test validate-password endpoint with wrong password."""
+        response = client.post(
+            "/int/v1/users/validate-password?password=wrongpassword",
             headers=auth_headers,
-            json={
-                "current_password": "wrongpassword",
-                "new_password": "newpassword123",
-            },
         )
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 

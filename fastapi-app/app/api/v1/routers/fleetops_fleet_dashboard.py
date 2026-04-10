@@ -124,6 +124,15 @@ def get_fleet_dashboard(
     )
     vehicles_in_use = int(in_use_q.scalar() or 0)
 
+    drivers_on_orders_q = db.query(func.count(func.distinct(Order.driver_assigned_uuid))).filter(
+        Order.company_uuid == cid,
+        Order.deleted_at.is_(None),
+        Order.driver_assigned_uuid.isnot(None),
+        Order.driver_assigned_uuid != "",
+        Order.status.notin_(list(TERMINAL_ORDER_STATUSES)),
+    )
+    drivers_on_active_orders = int(drivers_on_orders_q.scalar() or 0)
+
     # Pull active order assignments once and use them as fallback mapping for table display.
     active_order_pairs = (
         db.query(Order.driver_assigned_uuid, Order.vehicle_assigned_uuid)
@@ -162,7 +171,8 @@ def get_fleet_dashboard(
         dr_uuid = str(dr.uuid or "")
         linked_vehicle_uuid = str(dr.vehicle_uuid) if dr.vehicle_uuid else None
         fallback_vehicle_uuid = order_driver_to_vehicle.get(dr_uuid)
-        assigned_vehicle_uuid = linked_vehicle_uuid or fallback_vehicle_uuid
+        # Prefer active order assignment so dispatch matches order detail; fall back to driver↔vehicle link.
+        assigned_vehicle_uuid = fallback_vehicle_uuid or linked_vehicle_uuid
         assigned_vehicle = (
             vehicle_by_uuid.get(assigned_vehicle_uuid) if assigned_vehicle_uuid else None
         )
@@ -191,29 +201,30 @@ def get_fleet_dashboard(
     vehicles_out: list[FleetDashboardVehicleRow] = []
     for veh in vehicles_all:
         v_uuid = str(veh.uuid or "")
-        dr = assigned.get(v_uuid)
+        dr_linked = assigned.get(v_uuid)
         fallback_driver_uuid = order_vehicle_to_driver.get(v_uuid)
-        fallback_driver = (
-            driver_by_uuid.get(fallback_driver_uuid)
-            if fallback_driver_uuid and not dr
-            else None
+        dr_order = (
+            driver_by_uuid.get(fallback_driver_uuid) if fallback_driver_uuid else None
         )
+        # Prefer active order assignment over driver.vehicle_uuid link (same as driver rows).
+        effective_dr = dr_order or dr_linked
         lat_v, lng_v = _vehicle_meta_coords(veh.meta)
+        if effective_dr and effective_dr.uuid:
+            ad_uuid: Optional[str] = str(effective_dr.uuid)
+            ad_name: Optional[str] = _driver_name(effective_dr)
+        elif fallback_driver_uuid:
+            ad_uuid = fallback_driver_uuid
+            ad_name = None
+        else:
+            ad_uuid = None
+            ad_name = None
         vehicles_out.append(
             FleetDashboardVehicleRow(
                 vehicle_uuid=v_uuid,
                 plate_number=veh.plate_number,
                 status=veh.status,
-                assigned_driver_uuid=(
-                    str(dr.uuid)
-                    if dr and dr.uuid
-                    else (fallback_driver_uuid if fallback_driver_uuid else None)
-                ),
-                assigned_driver_name=(
-                    _driver_name(dr)
-                    if dr
-                    else (_driver_name(fallback_driver) if fallback_driver else None)
-                ),
+                assigned_driver_uuid=ad_uuid,
+                assigned_driver_name=ad_name,
                 latitude=lat_v,
                 longitude=lng_v,
             )
@@ -224,6 +235,7 @@ def get_fleet_dashboard(
             drivers_total=drivers_total,
             drivers_active=drivers_active,
             drivers_online=drivers_online,
+            drivers_on_active_orders=drivers_on_active_orders,
             drivers_unassigned=drivers_unassigned,
             vehicles_total=vehicles_total,
             vehicles_active=vehicles_active,

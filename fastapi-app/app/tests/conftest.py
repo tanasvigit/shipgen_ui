@@ -111,7 +111,19 @@ def test_company(db_session):
 @pytest.fixture
 def test_company_user(db_session, test_user, test_company):
     """Create a company-user relationship."""
+    existing = (
+        db_session.query(CompanyUser)
+        .filter(
+            CompanyUser.user_uuid == test_user.uuid,
+            CompanyUser.company_uuid == test_company.uuid,
+            CompanyUser.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if existing:
+        return existing
     company_user = CompanyUser(
+        uuid=str(uuid.uuid4()),
         user_uuid=test_user.uuid,
         company_uuid=test_company.uuid,
         status="active",

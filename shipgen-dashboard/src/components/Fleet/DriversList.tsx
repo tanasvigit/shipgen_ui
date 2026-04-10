@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { User, Eye, Edit, Trash2 } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { driversService, type UiDriver } from '../../services/driversService';
 import { ResponsiveTable } from '../ui/ResponsiveTable';
 import useListWithCrud from '../../hooks/useListWithCrud';
@@ -9,10 +9,19 @@ import { PH, SELECT_PH } from '../../constants/formPlaceholders';
 import Modal from '../common/Modal';
 import RouteDetailsModal from '../common/RouteDetailsModal';
 import DriverForm from './forms/DriverForm';
+import {
+  canDeleteDriverVehicleMasterData,
+  canManageDriverVehicleMasterData,
+  getStoredUserRole,
+} from '../../utils/roleAccess';
+import { UserRole } from '../../types';
 
 const PAGE_SIZE = 20;
 
 const DriversList: React.FC = () => {
+  const role = getStoredUserRole() ?? UserRole.VIEWER;
+  const canManageMasterData = canManageDriverVehicleMasterData(role);
+  const canDeleteMasterData = canDeleteDriverVehicleMasterData(role);
   const location = useLocation();
   const initialParams = new URLSearchParams(location.search);
   const [searchTerm, setSearchTerm] = useState('');
@@ -23,7 +32,6 @@ const DriversList: React.FC = () => {
   const [unassignedFilter, setUnassignedFilter] = useState(initialParams.get('unassigned') === 'true');
   const [page, setPage] = useState(1);
   const [listTotal, setListTotal] = useState(0);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -68,8 +76,8 @@ const DriversList: React.FC = () => {
       <StandardCrudListLayout
         title="Drivers"
         subtitle="Manage fleet drivers"
-        createOnClick={() => setIsCreateOpen(true)}
-        createLabel="New Driver"
+        createHref={canManageMasterData ? '/analytics/users?create=1&role=DRIVER' : undefined}
+        createLabel={canManageMasterData ? 'Create Driver User' : undefined}
         filters={
           <div className="grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-3">
             <select
@@ -120,17 +128,17 @@ const DriversList: React.FC = () => {
         emptyIcon={User}
         emptyTitleNoData="No drivers yet"
         emptyTitleNoMatch="No matching drivers"
-        emptyDescriptionNoData="Add drivers to assign to vehicles and routes."
+        emptyDescriptionNoData="Create DRIVER users from Users module; driver profiles are auto-provisioned."
         emptyDescriptionNoMatch="Try a different search or clear filters."
         emptyAction={
-          <button
-            type="button"
-            data-testid="drivers-empty-create"
-            onClick={() => setIsCreateOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
-          >
-            New driver
-          </button>
+          canManageMasterData ? (
+            <Link
+              to="/analytics/users?create=1&role=DRIVER"
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+            >
+              Create Driver User
+            </Link>
+          ) : undefined
         }
         noMatchAction={
           <button
@@ -199,50 +207,52 @@ const DriversList: React.FC = () => {
                   >
                     <Eye size={16} />
                   </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedId(driver.id);
-                      setIsEditOpen(true);
-                    }}
-                    className="rounded-lg p-2 text-blue-600 transition hover:bg-blue-50"
-                  >
-                    <Edit size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    data-testid={`driver-delete-${driver.id}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void deleteWithConfirm(driver.id, (id) => driversService.remove(id), {
-                        confirmMessage: 'Delete this driver?',
-                        successMessage: 'Driver deleted',
-                      });
-                    }}
-                    className="rounded-lg p-2 text-red-600 transition hover:bg-red-50"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {canManageMasterData ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedId(driver.id);
+                          setIsEditOpen(true);
+                        }}
+                        className="rounded-lg p-2 text-blue-600 transition hover:bg-blue-50"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      {canDeleteMasterData ? (
+                        <button
+                          type="button"
+                          data-testid={`driver-delete-${driver.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void deleteWithConfirm(driver.id, (id) => driversService.remove(id), {
+                              confirmMessage: 'Delete this driver?',
+                              successMessage: 'Driver deleted',
+                            });
+                          }}
+                          className="rounded-lg p-2 text-red-600 transition hover:bg-red-50"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      ) : null}
+                    </>
+                  ) : null}
                 </div>
               ),
             },
           ]}
         />
       </StandardCrudListLayout>
-      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Create Driver">
-        <DriverForm mode="create" onCancel={() => setIsCreateOpen(false)} onSuccess={async () => {
-          setIsCreateOpen(false);
-          await reload();
-        }} />
-      </Modal>
-      <Modal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit Driver">
-        <DriverForm mode="edit" driverId={selectedId ?? undefined} onCancel={() => setIsEditOpen(false)} onSuccess={async () => {
-          setIsEditOpen(false);
-          setSelectedId(null);
-          await reload();
-        }} />
-      </Modal>
+      {canManageMasterData ? (
+        <Modal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit Driver">
+          <DriverForm mode="edit" driverId={selectedId ?? undefined} onCancel={() => setIsEditOpen(false)} onSuccess={async () => {
+            setIsEditOpen(false);
+            setSelectedId(null);
+            await reload();
+          }} />
+        </Modal>
+      ) : null}
       <RouteDetailsModal
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
@@ -250,7 +260,7 @@ const DriversList: React.FC = () => {
         routePath={selectedId ? `/fleet/drivers/${encodeURIComponent(selectedId)}` : null}
         headerTitle="Driver Details"
         headerSubtitle={selectedId ?? undefined}
-        onDelete={async () => {
+        onDelete={canDeleteMasterData ? async () => {
           if (!selectedId) return;
           await deleteWithConfirm(selectedId, (id) => driversService.remove(id), {
             confirmMessage: 'Delete this driver?',
@@ -259,13 +269,13 @@ const DriversList: React.FC = () => {
           setIsDetailsOpen(false);
           setSelectedId(null);
           await reload();
-        }}
-        deleteLabel="Delete"
-        onEdit={() => {
+        } : undefined}
+        deleteLabel={canDeleteMasterData ? 'Delete' : undefined}
+        onEdit={canManageMasterData ? () => {
           setIsDetailsOpen(false);
           setIsEditOpen(true);
-        }}
-        editLabel="Edit Driver"
+        } : undefined}
+        editLabel={canManageMasterData ? 'Edit Driver' : undefined}
       />
 
       {listTotal > PAGE_SIZE && (

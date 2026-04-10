@@ -130,6 +130,15 @@ export const mockApi = {
     }
 
     if (path === '/fleet/dashboard') {
+      const terminalStatuses = ['completed', 'cancelled', 'failed'];
+      const activeOrders = mockOrders.filter(
+        (o) => !terminalStatuses.includes(String(o.status ?? '').toLowerCase())
+      );
+      const driversOnActiveOrders = new Set(
+        activeOrders
+          .map((o) => String((o as { driver_assigned_uuid?: string | null }).driver_assigned_uuid ?? ''))
+          .filter(Boolean)
+      ).size;
       const driversUnassigned = mockDrivers.filter((d: { vehicle_uuid?: string }) => !d.vehicle_uuid).length;
       const driverByVehicle: Record<string, (typeof mockDrivers)[0]> = {};
       mockDrivers.forEach((d: (typeof mockDrivers)[0] & { vehicle_uuid?: string }) => {
@@ -140,6 +149,7 @@ export const mockApi = {
         drivers_total: mockDrivers.length,
         drivers_active: mockDrivers.filter((d: { status?: string }) => d.status === 'active').length,
         drivers_online: mockDrivers.filter((d: { online?: number }) => d.online === 1).length,
+        drivers_on_active_orders: driversOnActiveOrders,
         drivers_unassigned: driversUnassigned,
         vehicles_total: mockVehicles.length,
         vehicles_active: mockVehicles.filter((v) => v.status === 'active').length,

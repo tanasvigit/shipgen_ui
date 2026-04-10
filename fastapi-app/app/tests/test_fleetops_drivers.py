@@ -3,6 +3,10 @@ Tests for FleetOps driver endpoints (/fleetops/v1/drivers).
 """
 import pytest
 from fastapi import status
+import uuid
+
+from app.models.user import User
+from app.core.security import get_password_hash
 
 
 @pytest.mark.fleetops
@@ -50,12 +54,26 @@ class TestDriverGet:
 class TestDriverCreate:
     """Test driver creation endpoint."""
 
-    def test_create_driver_success(self, client, auth_headers):
+    def test_create_driver_success(self, client, auth_headers, db_session, test_company):
         """Test creating a new driver."""
+        driver_user = User(
+            uuid=str(uuid.uuid4()),
+            public_id=f"user_{uuid.uuid4().hex[:12]}",
+            company_uuid=test_company.uuid,
+            name="Driver Create User",
+            email="driver.create@test.local",
+            password=get_password_hash("password123"),
+            role="DRIVER",
+            type="user",
+        )
+        db_session.add(driver_user)
+        db_session.commit()
+
         response = client.post(
             "/fleetops/v1/drivers",
             headers=auth_headers,
             json={
+                "user_uuid": driver_user.uuid,
                 "drivers_license_number": "DL-NEW-001",
                 "status": "active",
             },

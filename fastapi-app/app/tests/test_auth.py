@@ -112,7 +112,8 @@ class TestAuthBootstrap:
         response = client.get("/int/v1/auth/bootstrap", headers=auth_headers)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert "user" in data
+        assert "session" in data
+        assert "user" in data["session"]
         assert "organizations" in data
         assert isinstance(data["organizations"], list)
         if len(data["organizations"]) > 0:

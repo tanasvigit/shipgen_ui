@@ -17,7 +17,12 @@ import {
   LineChart,
 } from 'lucide-react';
 import { getFilteredNavigationItems } from '../constants';
-import { canAccessRoute, hasAccess } from '../utils/roleAccess';
+import {
+  canAccessRoute,
+  hasAccess,
+  isAIAssistantVisibleForRole,
+  isSidebarModuleVisibleForRole,
+} from '../utils/roleAccess';
 import { UserRole } from '../types';
 
 interface SidebarUser {
@@ -195,6 +200,8 @@ const moduleItems: ModuleItem[] = [
   },
 ];
 
+const VIEWER_HIDDEN_FLEET_OPERATIONS_CHILD_IDS = new Set(['fleets', 'devices']);
+
 const cn = (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
 
 const customModuleIcons: Record<string, React.ReactNode> = {
@@ -240,8 +247,20 @@ const Sidebar: React.FC<SidebarProps> = ({
     const { role } = currentUser;
     const out: ModuleItem[] = [];
     for (const item of moduleItems) {
+      if (!isSidebarModuleVisibleForRole(role, item.id)) {
+        continue;
+      }
       if (item.children?.length) {
-        const children = item.children.filter((c) => canAccessRoute(role, c.to));
+        const children = item.children.filter((c) => {
+          if (
+            role === UserRole.VIEWER &&
+            item.id === 'fleet-operations' &&
+            VIEWER_HIDDEN_FLEET_OPERATIONS_CHILD_IDS.has(c.id)
+          ) {
+            return false;
+          }
+          return canAccessRoute(role, c.to);
+        });
         if (!children.length) continue;
         out.push({ ...item, children });
         continue;
@@ -376,7 +395,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             })}
           </section>
 
-          {currentUser && hasAccess(currentUser.role, 'ai-assistant') ? (
+          {currentUser && isAIAssistantVisibleForRole(currentUser.role) ? (
             <section>
               <Link
                 to="/ai-assistant"

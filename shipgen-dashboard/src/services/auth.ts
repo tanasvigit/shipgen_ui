@@ -30,7 +30,8 @@ export async function logout() {
     if (userStr) {
       const user = JSON.parse(userStr);
       if (user && normalizeUserRole(user.role) === UserRole.DRIVER) {
-        await driversService.setOnline(false, 'inactive');
+        // Account switching should not deactivate the driver profile; only mark session offline.
+        await driversService.setOnline(false);
       }
     }
   } catch (err) {

@@ -755,7 +755,7 @@ const App: React.FC = () => {
               element={
                 <RoleGuard
                   userRole={currentUser?.role ?? null}
-                  requiredRole={[UserRole.ADMIN]}
+                  requiredRole={[UserRole.ADMIN, UserRole.OPERATIONS_MANAGER]}
                   fallbackPath={roleFallbackPath}
                 >
                   <UsersList />

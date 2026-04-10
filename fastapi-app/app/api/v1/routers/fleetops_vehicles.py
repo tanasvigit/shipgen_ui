@@ -111,7 +111,7 @@ def get_vehicle(
 def create_vehicle(
     payload: VehicleCreate,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER)),
 ):
     company_uuid = require_company_uuid(current)
     vehicle = Vehicle()
@@ -141,7 +141,7 @@ def update_vehicle(
     vehicle_id: str,
     payload: VehicleUpdate,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER)),
 ):
     company_uuid = require_company_uuid(current)
     vehicle = _get_vehicle_for_company(db, company_uuid=company_uuid, vehicle_id=vehicle_id)
@@ -162,7 +162,7 @@ def update_vehicle(
 def delete_vehicle(
     vehicle_id: str,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
+    current: User = Depends(require_roles(ADMIN)),
 ):
     company_uuid = require_company_uuid(current)
     vehicle = _get_vehicle_for_company(db, company_uuid=company_uuid, vehicle_id=vehicle_id)

@@ -7,6 +7,7 @@ class FleetDashboardKpis(BaseModel):
     drivers_total: int
     drivers_active: int
     drivers_online: int
+    drivers_on_active_orders: int
     drivers_unassigned: int
     vehicles_total: int
     vehicles_active: int

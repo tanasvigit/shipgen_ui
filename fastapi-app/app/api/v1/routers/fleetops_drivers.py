@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.routers.auth import _get_current_user
 from app.core.company_scope import require_company_uuid
 from app.core.database import get_db
-from app.core.roles import ADMIN, DISPATCHER, OPERATIONS_MANAGER, require_roles
+from app.core.roles import ADMIN, DRIVER, DISPATCHER, OPERATIONS_MANAGER, effective_user_role, require_roles
 from app.models.driver import Driver
 from app.models.order import Order
 from app.models.user import User
@@ -52,6 +52,30 @@ def _get_driver_for_company(
     if not include_deleted:
         q = q.filter(Driver.deleted_at.is_(None))
     return q.first()
+
+
+def _validate_driver_user_link(
+    db: Session, *, company_uuid: str, user_uuid: str
+) -> None:
+    user = (
+        db.query(User)
+        .filter(
+            User.uuid == user_uuid,
+            User.company_uuid == company_uuid,
+            User.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Linked user not found in current company.",
+        )
+    if effective_user_role(user) != DRIVER:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Linked user must have DRIVER role.",
+        )
 
 
 @router.get("/", response_model=DriversListResponse)
@@ -118,24 +142,29 @@ def get_driver(
 def create_driver(
     payload: DriverCreate,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER)),
 ):
     company_uuid = require_company_uuid(current)
-    if payload.user_uuid:
-        existing_link = (
-            db.query(Driver)
-            .filter(
-                Driver.company_uuid == company_uuid,
-                Driver.user_uuid == payload.user_uuid,
-                Driver.deleted_at.is_(None),
-            )
-            .first()
+    if not payload.user_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="user_uuid is required. Create the DRIVER user first, then link profile.",
         )
-        if existing_link:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="A driver is already linked to this user_uuid.",
-            )
+    _validate_driver_user_link(db, company_uuid=company_uuid, user_uuid=payload.user_uuid)
+    existing_link = (
+        db.query(Driver)
+        .filter(
+            Driver.company_uuid == company_uuid,
+            Driver.user_uuid == payload.user_uuid,
+            Driver.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if existing_link:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A driver is already linked to this user_uuid.",
+        )
     driver = Driver()
     driver.uuid = str(uuid.uuid4())
     driver.public_id = f"driver_{uuid.uuid4().hex[:12]}"
@@ -218,7 +247,7 @@ def update_driver(
     driver_id: str,
     payload: DriverUpdate,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER)),
 ):
     company_uuid = require_company_uuid(current)
     driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_id)
@@ -227,6 +256,7 @@ def update_driver(
 
     updates = payload.model_dump(exclude_unset=True)
     if "user_uuid" in updates and updates["user_uuid"]:
+        _validate_driver_user_link(db, company_uuid=company_uuid, user_uuid=updates["user_uuid"])
         existing_link = (
             db.query(Driver)
             .filter(
@@ -256,7 +286,7 @@ def update_driver(
 def delete_driver(
     driver_id: str,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER, DISPATCHER)),
+    current: User = Depends(require_roles(ADMIN)),
 ):
     company_uuid = require_company_uuid(current)
     driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_id)

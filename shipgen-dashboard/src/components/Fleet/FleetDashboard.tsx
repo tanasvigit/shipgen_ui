@@ -106,7 +106,11 @@ const FleetDashboard: React.FC = () => {
           value={kpis.drivers_active}
           onClick={() => navigate('/fleet/drivers?status=active')}
         />
-        <KpiCard label="Online drivers" value={kpis.drivers_online} onClick={() => navigate('/fleet/drivers?online=1')} />
+        <KpiCard
+          label="Drivers on active orders"
+          value={kpis.drivers_on_active_orders}
+          onClick={() => navigate('/logistics/orders')}
+        />
         <KpiCard
           label="Unassigned drivers"
           value={kpis.drivers_unassigned}

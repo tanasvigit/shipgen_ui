@@ -4,6 +4,8 @@ export interface FleetDashboardKpis {
   drivers_total: number;
   drivers_active: number;
   drivers_online: number;
+  /** Distinct drivers on at least one active order (pairs with vehicles_in_use). */
+  drivers_on_active_orders: number;
   drivers_unassigned: number;
   vehicles_total: number;
   vehicles_active: number;

@@ -7,11 +7,13 @@ import { FormActions, FormContainer, FormField, FormSection, Input, Select } fro
 interface UserFormProps {
   mode: 'create' | 'edit';
   userId?: string;
+  initialRole?: 'ADMIN' | 'OPERATIONS_MANAGER' | 'DISPATCHER' | 'DRIVER' | 'VIEWER';
+  lockRole?: boolean;
   onSuccess: () => Promise<void> | void;
   onCancel: () => void;
 }
 
-const UserForm: React.FC<UserFormProps> = ({ mode, userId, onSuccess, onCancel }) => {
+const UserForm: React.FC<UserFormProps> = ({ mode, userId, initialRole, lockRole = false, onSuccess, onCancel }) => {
   const [loading, setLoading] = useState(mode === 'edit');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +47,11 @@ const UserForm: React.FC<UserFormProps> = ({ mode, userId, onSuccess, onCancel }
     };
     void load();
   }, [mode, userId]);
+
+  useEffect(() => {
+    if (mode !== 'create' || !initialRole) return;
+    setForm((prev) => ({ ...prev, role: initialRole }));
+  }, [mode, initialRole]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,6 +138,7 @@ const UserForm: React.FC<UserFormProps> = ({ mode, userId, onSuccess, onCancel }
               id="user-role"
               value={form.role}
               onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
+              disabled={mode === 'create' && lockRole}
             >
               <option value="" disabled>
                 Select role

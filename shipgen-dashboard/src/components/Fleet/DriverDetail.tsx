@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, User, AlertCircle, Pencil, Trash2 } from 'lucide-react';
 import { driversService, type UiDriver } from '../../services/driversService';
+import { canManageDriverVehicleMasterData, getStoredUserRole } from '../../utils/roleAccess';
+import { UserRole } from '../../types';
 
 const DriverDetail: React.FC = () => {
+  const role = getStoredUserRole() ?? UserRole.VIEWER;
+  const canManageMasterData = canManageDriverVehicleMasterData(role);
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const isEmbedded = new URLSearchParams(location.search).get('embed') === '1';
@@ -70,7 +74,7 @@ const DriverDetail: React.FC = () => {
           <p className="text-sm text-gray-600 mt-1">{driver.id}</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          {!isEmbedded ? (
+          {canManageMasterData && !isEmbedded ? (
             <Link
               to="/fleet/drivers"
               className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -79,13 +83,15 @@ const DriverDetail: React.FC = () => {
               Open List To Edit
             </Link>
           ) : null}
-          <button
-            onClick={handleDelete}
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
-          >
-            <Trash2 size={14} />
-            Delete
-          </button>
+          {canManageMasterData ? (
+            <button
+              onClick={handleDelete}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
+            >
+              <Trash2 size={14} />
+              Delete
+            </button>
+          ) : null}
         </div>
         </div>
       ) : null}

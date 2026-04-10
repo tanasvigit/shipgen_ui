@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import List
 import uuid as uuidlib
 
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.routers.auth import _get_current_user
 from app.core.database import get_db
-from app.core.roles import ADMIN, ALL_ROLES, DISPATCHER, require_roles
+from app.core.roles import ADMIN, ALL_ROLES, DISPATCHER, OPERATIONS_MANAGER, require_roles
 from app.core.security import get_password_hash, verify_password
 from app.models.driver import Driver
 from app.models.twofa import TwoFaSetting
@@ -55,11 +56,17 @@ def _provision_driver_for_user_if_needed(db: Session, user: User) -> None:
         .filter(
             Driver.company_uuid == user.company_uuid,
             Driver.user_uuid == user.uuid,
-            Driver.deleted_at.is_(None),
         )
+        .order_by(Driver.id.desc())
         .first()
     )
     if existing:
+        # Ensure DRIVER onboarding is deterministic: linked profile is active regardless of previous state.
+        existing.deleted_at = None
+        existing.status = "active"
+        if existing.online is None:
+            existing.online = 0
+        db.add(existing)
         return
     driver = Driver()
     driver.uuid = str(uuidlib.uuid4())
@@ -94,7 +101,7 @@ def _deactivate_driver_for_user_if_needed(db: Session, user: User) -> None:
 @router.get("/", response_model=List[UserOut])
 def list_users(
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(ADMIN)),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER)),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
@@ -126,7 +133,7 @@ def current_user(
 def get_user(
     user_id: str,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(ADMIN)),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER)),
 ):
     user_uuid = _normalize_user_uuid_or_422(user_id)
     user = db.query(User).filter(User.uuid == user_uuid).first()
@@ -141,7 +148,7 @@ def get_user(
 def create_user(
     payload: UserCreate,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(ADMIN)),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER)),
 ):
     if not payload.role:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="role is required.")
@@ -172,7 +179,7 @@ def update_user(
     user_id: str,
     payload: UserUpdate,
     db: Session = Depends(get_db),
-    current: User = Depends(require_roles(ADMIN)),
+    current: User = Depends(require_roles(ADMIN, OPERATIONS_MANAGER)),
 ):
     user_uuid = _normalize_user_uuid_or_422(user_id)
     user = db.query(User).filter(User.uuid == user_uuid).first()
@@ -214,7 +221,8 @@ def delete_user(
     if current.company_uuid and user.company_uuid and user.company_uuid != current.company_uuid:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
 
-    user.deleted_at = user.deleted_at or user.updated_at
+    _deactivate_driver_for_user_if_needed(db, user)
+    user.deleted_at = user.deleted_at or user.updated_at or datetime.now(timezone.utc)
     db.add(user)
     db.commit()
 
