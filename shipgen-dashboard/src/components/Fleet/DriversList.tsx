@@ -71,6 +71,14 @@ const DriversList: React.FC = () => {
     });
   }, [rows, searchTerm]);
 
+  const getDriverDisplayName = (driver: UiDriver): string => {
+    const fullName = (driver.name || '').trim();
+    if (fullName.length > 0) return fullName;
+    const license = (driver.drivers_license_number || '').trim();
+    if (license.length > 0) return license;
+    return driver.id;
+  };
+
   return (
     <>
       <StandardCrudListLayout
@@ -165,12 +173,12 @@ const DriversList: React.FC = () => {
           }}
           columns={[
             {
-              key: 'driver_id',
-              header: 'driver_id',
+              key: 'driver_name',
+              header: 'driver_name',
               render: (driver) => (
                 <div className="flex items-center space-x-2">
                   <User size={16} className="text-blue-500" />
-                  <span className="text-sm font-medium text-gray-900">{driver.id}</span>
+                  <span className="text-sm font-medium text-gray-900">{getDriverDisplayName(driver)}</span>
                 </div>
               ),
             },

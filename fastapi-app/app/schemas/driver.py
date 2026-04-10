@@ -21,6 +21,7 @@ def _coerce_optional_float(v: Any) -> Optional[float]:
 class DriverBase(BaseModel):
     uuid: Optional[str] = None
     public_id: Optional[str] = None
+    name: Optional[str] = None
     company_uuid: Optional[str] = None
     user_uuid: Optional[str] = None
     vehicle_uuid: Optional[str] = None

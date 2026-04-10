@@ -71,6 +71,24 @@ const formatStepLabel = (step: string) =>
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
 
+const driverDisplayName = (driver: UiDriver): string => {
+  const fullName = (driver.name || '').trim();
+  if (fullName.length > 0) return fullName;
+  const license = (driver.drivers_license_number || '').trim();
+  if (license.length > 0) return license;
+  return driver.id;
+};
+
+const vehicleDisplayName = (vehicle: UiVehicle): string => {
+  const vehicleName = (vehicle.make || '').trim();
+  if (vehicleName.length > 0) return vehicleName;
+  const plate = (vehicle.plate_number || '').trim();
+  if (plate.length > 0) return plate;
+  const composed = `${vehicle.make || ''} ${vehicle.model || ''}`.trim();
+  if (composed.length > 0) return composed;
+  return vehicle.id;
+};
+
 const OrderStatusFlowStepper: React.FC<{ status: string }> = ({ status }) => {
   const normalized = (status || 'created').toLowerCase();
   const terminal = normalized === 'cancelled' || normalized === 'failed';
@@ -397,10 +415,10 @@ const DispatchBoard: React.FC = () => {
                     value={assignDriverByOrder[selectedOrder.id] || ''}
                     onChange={(e) => setAssignDriverByOrder((prev) => ({ ...prev, [selectedOrder.id]: e.target.value }))}
                     options={[
-                      { value: '', label: 'Auto assign' },
+                      { value: '', label: 'Select driver' },
                       ...drivers.map((driver) => ({
                         value: driver.id,
-                        label: `${driver.id} (${driver.status})`,
+                        label: `${driverDisplayName(driver)} (${driver.status})`,
                       })),
                     ]}
                   />
@@ -409,10 +427,10 @@ const DispatchBoard: React.FC = () => {
                     value={assignVehicleByOrder[selectedOrder.id] || ''}
                     onChange={(e) => setAssignVehicleByOrder((prev) => ({ ...prev, [selectedOrder.id]: e.target.value }))}
                     options={[
-                      { value: '', label: 'Auto / Driver linked vehicle' },
+                      { value: '', label: 'Select vehicle' },
                       ...vehicles.map((vehicle) => ({
                         value: vehicle.id,
-                        label: `${vehicle.plate_number || vehicle.id} (${vehicle.status})`,
+                        label: `${vehicleDisplayName(vehicle)} (${vehicle.status})`,
                       })),
                     ]}
                   />

@@ -85,7 +85,11 @@ const UsersList: React.FC = () => {
         </div>
         <button
           type="button"
-          onClick={() => setIsCreateOpen(true)}
+          onClick={() => {
+            setCreateRole(undefined);
+            setLockCreateRole(false);
+            setIsCreateOpen(true);
+          }}
           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
         >
           <Plus size={16} />
@@ -189,7 +193,15 @@ const UsersList: React.FC = () => {
         </div>
       )}
 
-      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Create User">
+      <Modal
+        isOpen={isCreateOpen}
+        onClose={() => {
+          setIsCreateOpen(false);
+          setCreateRole(undefined);
+          setLockCreateRole(false);
+        }}
+        title="Create User"
+      >
         <UserForm
           mode="create"
           initialRole={createRole}

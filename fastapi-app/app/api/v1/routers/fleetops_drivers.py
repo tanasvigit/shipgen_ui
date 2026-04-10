@@ -78,6 +78,30 @@ def _validate_driver_user_link(
         )
 
 
+def _driver_name_by_user_uuid(db: Session, *, user_uuid: str | None, company_uuid: str) -> str | None:
+    if not user_uuid:
+        return None
+    user = (
+        db.query(User.name)
+        .filter(
+            User.uuid == user_uuid,
+            User.company_uuid == company_uuid,
+            User.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if not user:
+        return None
+    return str(user[0]) if user[0] else None
+
+
+def _driver_out(db: Session, *, driver: Driver, company_uuid: str) -> DriverOut:
+    out = DriverOut.model_validate(driver)
+    return out.model_copy(
+        update={"name": _driver_name_by_user_uuid(db, user_uuid=driver.user_uuid, company_uuid=company_uuid)}
+    )
+
+
 @router.get("/", response_model=DriversListResponse)
 def list_drivers(
     db: Session = Depends(get_db),
@@ -118,7 +142,7 @@ def list_drivers(
     total = query.count()
     drivers = query.offset(offset).limit(limit).all()
     return DriversListResponse(
-        data=[DriverOut.model_validate(d) for d in drivers],
+        data=[_driver_out(db, driver=d, company_uuid=company_uuid) for d in drivers],
         total=total,
         limit=limit,
         offset=offset,
@@ -135,7 +159,7 @@ def get_driver(
     driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_id)
     if not driver:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found.")
-    return DriverResponse(driver=DriverOut.model_validate(driver))
+    return DriverResponse(driver=_driver_out(db, driver=driver, company_uuid=company_uuid))
 
 
 @router.post("/", response_model=DriverResponse, status_code=status.HTTP_201_CREATED)
@@ -178,7 +202,7 @@ def create_driver(
     db.commit()
     db.refresh(driver)
 
-    return DriverResponse(driver=DriverOut.model_validate(driver))
+    return DriverResponse(driver=_driver_out(db, driver=driver, company_uuid=company_uuid))
 
 
 @router.post("/register-device")
@@ -214,7 +238,7 @@ def track_driver_global(
     db.add(driver)
     db.commit()
     db.refresh(driver)
-    return DriverResponse(driver=DriverOut.model_validate(driver))
+    return DriverResponse(driver=_driver_out(db, driver=driver, company_uuid=company_uuid))
 
 
 @router.post("/switch-organization", response_model=DriverResponse)

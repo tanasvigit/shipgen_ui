@@ -99,7 +99,7 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ mode, vehicleId, onSuccess, o
       setError(null);
       if (mode === 'edit' && vehicleId) {
         if (!form.make?.trim() || !form.model?.trim() || !form.type?.trim() || !form.vin?.trim()) {
-          setError('Make, model, type, and VIN are required');
+          setError('Vehicle name, model, type, and VIN are required');
           setSaving(false);
           return;
         }
@@ -181,7 +181,7 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ mode, vehicleId, onSuccess, o
               autoComplete="off"
             />
           </FormField>
-          <FormField label="Make" required htmlFor="vehicle-make">
+          <FormField label="Vehicle Name" required htmlFor="vehicle-make">
             <Input
               id="vehicle-make"
               value={form.make}

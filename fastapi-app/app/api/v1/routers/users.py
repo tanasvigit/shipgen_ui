@@ -46,7 +46,9 @@ def _ensure_user_identifiers(user: User) -> bool:
     return changed
 
 
-def _provision_driver_for_user_if_needed(db: Session, user: User) -> None:
+def _provision_driver_for_user_if_needed(
+    db: Session, user: User, *, drivers_license_number: str | None = None
+) -> None:
     if not user.uuid or not user.company_uuid:
         return
     if _normalize_role(user.role) != "DRIVER":
@@ -64,6 +66,8 @@ def _provision_driver_for_user_if_needed(db: Session, user: User) -> None:
         # Ensure DRIVER onboarding is deterministic: linked profile is active regardless of previous state.
         existing.deleted_at = None
         existing.status = "active"
+        if drivers_license_number is not None:
+            existing.drivers_license_number = drivers_license_number
         if existing.online is None:
             existing.online = 0
         db.add(existing)
@@ -73,7 +77,7 @@ def _provision_driver_for_user_if_needed(db: Session, user: User) -> None:
     driver.public_id = f"driver_{uuidlib.uuid4().hex[:12]}"
     driver.company_uuid = user.company_uuid
     driver.user_uuid = user.uuid
-    driver.drivers_license_number = None
+    driver.drivers_license_number = drivers_license_number
     driver.status = "active"
     driver.online = 0
     db.add(driver)
@@ -166,7 +170,11 @@ def create_user(
         user.password = get_password_hash(payload.password)
 
     db.add(user)
-    _provision_driver_for_user_if_needed(db, user)
+    _provision_driver_for_user_if_needed(
+        db,
+        user,
+        drivers_license_number=(payload.drivers_license_number.strip() if payload.drivers_license_number else None),
+    )
     db.commit()
     db.refresh(user)
 

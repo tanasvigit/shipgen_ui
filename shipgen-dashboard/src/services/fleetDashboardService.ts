@@ -16,9 +16,11 @@ export interface FleetDashboardKpis {
 export interface FleetDashboardDriverRow {
   driver_uuid: string;
   public_id: string | null;
+  driver_name: string | null;
   status: string | null;
   online: number;
   vehicle_uuid: string | null;
+  vehicle_name: string | null;
   vehicle_plate: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -26,6 +28,7 @@ export interface FleetDashboardDriverRow {
 
 export interface FleetDashboardVehicleRow {
   vehicle_uuid: string;
+  vehicle_name: string | null;
   plate_number: string | null;
   status: string | null;
   assigned_driver_uuid: string | null;

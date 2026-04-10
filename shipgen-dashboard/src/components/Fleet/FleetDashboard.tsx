@@ -5,7 +5,6 @@ import PageContainer from '../ui/PageContainer';
 import { ResponsiveTable } from '../ui/ResponsiveTable';
 import {
   fleetDashboardService,
-  formatLatLng,
   type FleetDashboardPayload,
   type FleetDashboardDriverRow,
   type FleetDashboardVehicleRow,
@@ -150,13 +149,13 @@ const FleetDashboard: React.FC = () => {
             columns={[
               {
                 key: 'id',
-                header: 'Driver ID',
+                header: 'Driver Name',
                 render: (d) => (
                   <Link
                     to={`/fleet/drivers/${encodeURIComponent(d.driver_uuid)}`}
                     className="text-sm font-medium text-blue-600 hover:underline"
                   >
-                    {d.public_id || d.driver_uuid}
+                    {d.driver_name || d.public_id || d.driver_uuid}
                   </Link>
                 ),
               },
@@ -177,26 +176,22 @@ const FleetDashboard: React.FC = () => {
                 header: 'Assigned vehicle',
                 render: (d) => (
                   <span className="text-sm text-gray-700">
-                    {d.vehicle_plate && d.vehicle_uuid ? (
+                    {d.vehicle_uuid ? (
                       <Link
                         to={`/fleet/vehicles/${encodeURIComponent(d.vehicle_uuid)}`}
                         className="text-blue-600 hover:underline"
                       >
-                        {d.vehicle_plate}
+                        {(() => {
+                          const name = (d.vehicle_name || '').trim();
+                          const plate = (d.vehicle_plate || '').trim();
+                          if (name && plate) return `${name} (${plate})`;
+                          return name || plate || d.vehicle_uuid;
+                        })()}
                       </Link>
-                    ) : d.vehicle_plate ? (
-                      d.vehicle_plate
                     ) : (
                       '—'
                     )}
                   </span>
-                ),
-              },
-              {
-                key: 'loc',
-                header: 'Location',
-                render: (d) => (
-                  <span className="font-mono text-xs text-gray-700">{formatLatLng(d.latitude, d.longitude)}</span>
                 ),
               },
             ]}
@@ -213,16 +208,21 @@ const FleetDashboard: React.FC = () => {
             emptyMessage="No vehicles"
             columns={[
               {
-                key: 'plate',
-                header: 'Plate',
+                key: 'vehicle_name',
+                header: 'Vehicle Name',
                 render: (v) => (
                   <Link
                     to={`/fleet/vehicles/${encodeURIComponent(v.vehicle_uuid)}`}
                     className="text-sm font-medium text-blue-600 hover:underline"
                   >
-                    {v.plate_number || v.vehicle_uuid}
+                    {v.vehicle_name || v.plate_number || v.vehicle_uuid}
                   </Link>
                 ),
+              },
+              {
+                key: 'plate',
+                header: 'Plate',
+                render: (v) => <span className="text-sm text-gray-700">{v.plate_number || '—'}</span>,
               },
               {
                 key: 'status',
@@ -243,13 +243,6 @@ const FleetDashboard: React.FC = () => {
                   ) : (
                     <span className="text-sm text-gray-500">—</span>
                   ),
-              },
-              {
-                key: 'loc',
-                header: 'Last location',
-                render: (v) => (
-                  <span className="font-mono text-xs text-gray-700">{formatLatLng(v.latitude, v.longitude)}</span>
-                ),
               },
             ]}
           />

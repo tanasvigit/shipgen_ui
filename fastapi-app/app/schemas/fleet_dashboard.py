@@ -18,9 +18,11 @@ class FleetDashboardKpis(BaseModel):
 class FleetDashboardDriverRow(BaseModel):
     driver_uuid: str
     public_id: Optional[str] = None
+    driver_name: Optional[str] = None
     status: Optional[str] = None
     online: int = 0
     vehicle_uuid: Optional[str] = None
+    vehicle_name: Optional[str] = None
     vehicle_plate: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -28,6 +30,7 @@ class FleetDashboardDriverRow(BaseModel):
 
 class FleetDashboardVehicleRow(BaseModel):
     vehicle_uuid: str
+    vehicle_name: Optional[str] = None
     plate_number: Optional[str] = None
     status: Optional[str] = None
     assigned_driver_uuid: Optional[str] = None

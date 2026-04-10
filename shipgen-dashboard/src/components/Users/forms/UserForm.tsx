@@ -23,6 +23,7 @@ const UserForm: React.FC<UserFormProps> = ({ mode, userId, initialRole, lockRole
     password: '',
     role: '',
     status: '',
+    drivers_license_number: '',
   });
 
   useEffect(() => {
@@ -38,6 +39,7 @@ const UserForm: React.FC<UserFormProps> = ({ mode, userId, initialRole, lockRole
           password: '',
           role: row.role || '',
           status: row.status || '',
+          drivers_license_number: '',
         });
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to load user');
@@ -71,6 +73,10 @@ const UserForm: React.FC<UserFormProps> = ({ mode, userId, initialRole, lockRole
       setError('Role is required');
       return;
     }
+    if (mode === 'create' && form.role.trim() === 'DRIVER' && !form.drivers_license_number.trim()) {
+      setError('DL Number is required for DRIVER');
+      return;
+    }
     try {
       setSaving(true);
       setError(null);
@@ -87,6 +93,8 @@ const UserForm: React.FC<UserFormProps> = ({ mode, userId, initialRole, lockRole
           email: form.email.trim(),
           password: form.password,
           role: form.role.trim() as 'ADMIN' | 'OPERATIONS_MANAGER' | 'DISPATCHER' | 'DRIVER' | 'VIEWER',
+          drivers_license_number:
+            form.role.trim() === 'DRIVER' ? form.drivers_license_number.trim() : undefined,
         });
       }
       await onSuccess();
@@ -151,15 +159,28 @@ const UserForm: React.FC<UserFormProps> = ({ mode, userId, initialRole, lockRole
             </Select>
           </FormField>
           {mode === 'create' ? (
-            <FormField className="md:col-span-2" label="password" required htmlFor="user-password">
-              <Input
-                id="user-password"
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                placeholder={PH.password}
-              />
-            </FormField>
+            <>
+              <FormField className="md:col-span-2" label="password" required htmlFor="user-password">
+                <Input
+                  id="user-password"
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                  placeholder={PH.password}
+                />
+              </FormField>
+              {form.role === 'DRIVER' ? (
+                <FormField className="md:col-span-2" label="DL Number" required htmlFor="user-driver-dl-number">
+                  <Input
+                    id="user-driver-dl-number"
+                    type="text"
+                    value={form.drivers_license_number}
+                    onChange={(e) => setForm((p) => ({ ...p, drivers_license_number: e.target.value }))}
+                    placeholder={PH.licenseNumber}
+                  />
+                </FormField>
+              ) : null}
+            </>
           ) : (
             <FormField className="md:col-span-2" label="status" htmlFor="user-status">
               <Input

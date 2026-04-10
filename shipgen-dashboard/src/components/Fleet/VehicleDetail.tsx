@@ -17,6 +17,14 @@ const VehicleDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const getVehicleDisplayName = (v: UiVehicle): string => {
+    const plate = (v.plate_number || '').trim();
+    if (plate.length > 0) return plate;
+    const composed = `${v.make || ''} ${v.model || ''}`.trim();
+    if (composed.length > 0) return composed;
+    return v.id;
+  };
+
   useEffect(() => {
     if (!id) return;
     const loadVehicle = async () => {
@@ -71,7 +79,7 @@ const VehicleDetail: React.FC = () => {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Vehicle Details</h1>
-            <p className="text-sm text-gray-600 mt-1">{vehicle.id}</p>
+            <p className="text-sm text-gray-600 mt-1">{getVehicleDisplayName(vehicle)}</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
             {canManageMasterData ? (
@@ -107,7 +115,7 @@ const VehicleDetail: React.FC = () => {
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-lg font-bold text-gray-900 mb-4">Vehicle Information</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div><label className="text-xs text-gray-500 uppercase">id</label><p className="text-sm font-medium">{vehicle.id}</p></div>
+          <div><label className="text-xs text-gray-500 uppercase">vehicle_name</label><p className="text-sm font-medium">{getVehicleDisplayName(vehicle)}</p></div>
           <div><label className="text-xs text-gray-500 uppercase">plate_number</label><p className="text-sm font-medium">{vehicle.plate_number}</p></div>
           <div><label className="text-xs text-gray-500 uppercase">make</label><p className="text-sm font-medium">{vehicle.make}</p></div>
           <div><label className="text-xs text-gray-500 uppercase">model</label><p className="text-sm font-medium">{vehicle.model}</p></div>

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import SubNavigation from '../SubNavigation';
+import { canAccessRoute, getStoredUserRole } from '../../utils/roleAccess';
+import { UserRole } from '../../types';
 
 const LogisticsLayout: React.FC = () => {
   const location = useLocation();
@@ -20,6 +22,8 @@ const LogisticsLayout: React.FC = () => {
         (p.startsWith('/logistics/orders/') && !p.startsWith('/logistics/orders/dispatch-board')),
     },
   ];
+  const role = getStoredUserRole() ?? UserRole.VIEWER;
+  const visibleSubNavItems = subNavItems.filter((item) => canAccessRoute(role, item.path));
   const contentGutter = 'px-4 sm:px-5 lg:px-8';
 
   return (
@@ -32,7 +36,7 @@ const LogisticsLayout: React.FC = () => {
     >
       {!isEmbedded ? (
         <div className={contentGutter}>
-          <SubNavigation items={subNavItems} basePath="/logistics" />
+          <SubNavigation items={visibleSubNavItems} basePath="/logistics" />
         </div>
       ) : null}
       <Outlet />

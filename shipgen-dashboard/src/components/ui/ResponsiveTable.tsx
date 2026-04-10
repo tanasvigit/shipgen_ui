@@ -6,6 +6,7 @@ interface Column<T> {
   render: (item: T) => React.ReactNode;
   mobileHidden?: boolean;
   sticky?: boolean;
+  align?: 'left' | 'right' | 'center';
 }
 
 interface ResponsiveTableProps<T> {
@@ -46,7 +47,9 @@ export function ResponsiveTable<T>({
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className={`text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase ${
+                  className={`py-3 px-4 text-xs font-semibold text-gray-600 uppercase ${
+                    col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
+                  } ${
                     col.sticky ? 'sticky left-0 bg-gray-50 z-10' : ''
                   }`}
                 >
@@ -69,6 +72,8 @@ export function ResponsiveTable<T>({
                   <td
                     key={col.key}
                     className={`py-3 px-4 ${
+                      col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
+                    } ${
                       col.sticky ? 'sticky left-0 bg-white z-10' : ''
                     }`}
                   >

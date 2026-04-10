@@ -4,6 +4,7 @@ import type { PaginatedResponse } from '../types/api';
 
 export interface UiDriver {
   id: string;
+  name?: string | null;
   company_uuid: string | null;
   user_uuid: string | null;
   vehicle_uuid?: string | null;
@@ -24,6 +25,7 @@ interface BackendDriver {
   id?: number | null;
   uuid?: string | null;
   public_id?: string | null;
+  name?: string | null;
   company_uuid?: string | null;
   user_uuid?: string | null;
   vehicle_uuid?: string | null;
@@ -48,6 +50,7 @@ const toStr = (v?: string | null): string | null => (v == null ? null : String(v
 
 const mapBackendDriverToUi = (driver: BackendDriver): UiDriver => ({
   id: String(driver.uuid ?? driver.id ?? ''),
+  name: toStr(driver.name),
   company_uuid: toStr(driver.company_uuid),
   user_uuid: toStr(driver.user_uuid),
   vehicle_uuid: toStr(driver.vehicle_uuid),

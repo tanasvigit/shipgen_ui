@@ -253,6 +253,13 @@ const Sidebar: React.FC<SidebarProps> = ({
       if (item.children?.length) {
         const children = item.children.filter((c) => {
           if (
+            role === UserRole.DRIVER &&
+            item.id === 'logistics' &&
+            (c.id === 'dispatch-board' || c.id === 'customers')
+          ) {
+            return false;
+          }
+          if (
             role === UserRole.VIEWER &&
             item.id === 'fleet-operations' &&
             VIEWER_HIDDEN_FLEET_OPERATIONS_CHILD_IDS.has(c.id)

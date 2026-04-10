@@ -159,6 +159,23 @@ def get_fleet_dashboard(
 
     drivers_all = drivers_base().order_by(Driver.id.asc()).all()
     vehicles_all = vehicles_base().order_by(Vehicle.id.asc()).all()
+    driver_user_uuids = [str(d.user_uuid) for d in drivers_all if d.user_uuid]
+    user_name_by_uuid: dict[str, str] = {}
+    if driver_user_uuids:
+        user_rows = (
+            db.query(User.uuid, User.name)
+            .filter(
+                User.company_uuid == cid,
+                User.deleted_at.is_(None),
+                User.uuid.in_(driver_user_uuids),
+            )
+            .all()
+        )
+        user_name_by_uuid = {
+            str(u_uuid): str(name).strip()
+            for u_uuid, name in user_rows
+            if u_uuid and name and str(name).strip()
+        }
     vehicle_by_uuid: dict[str, Vehicle] = {
         str(v.uuid): v for v in vehicles_all if v.uuid
     }
@@ -180,9 +197,11 @@ def get_fleet_dashboard(
             FleetDashboardDriverRow(
                 driver_uuid=dr_uuid,
                 public_id=dr.public_id,
+                driver_name=user_name_by_uuid.get(str(dr.user_uuid or ""), _driver_name(dr)),
                 status=dr.status,
                 online=int(dr.online or 0),
                 vehicle_uuid=assigned_vehicle_uuid,
+                vehicle_name=(str(assigned_vehicle.make).strip() if assigned_vehicle and assigned_vehicle.make else None),
                 vehicle_plate=assigned_vehicle.plate_number if assigned_vehicle else None,
                 latitude=_coerce_float(dr.latitude),
                 longitude=_coerce_float(dr.longitude),
@@ -211,7 +230,9 @@ def get_fleet_dashboard(
         lat_v, lng_v = _vehicle_meta_coords(veh.meta)
         if effective_dr and effective_dr.uuid:
             ad_uuid: Optional[str] = str(effective_dr.uuid)
-            ad_name: Optional[str] = _driver_name(effective_dr)
+            ad_name: Optional[str] = user_name_by_uuid.get(
+                str(effective_dr.user_uuid or ""), _driver_name(effective_dr)
+            )
         elif fallback_driver_uuid:
             ad_uuid = fallback_driver_uuid
             ad_name = None
@@ -221,6 +242,7 @@ def get_fleet_dashboard(
         vehicles_out.append(
             FleetDashboardVehicleRow(
                 vehicle_uuid=v_uuid,
+                vehicle_name=(str(veh.make).strip() if veh.make else None),
                 plate_number=veh.plate_number,
                 status=veh.status,
                 assigned_driver_uuid=ad_uuid,

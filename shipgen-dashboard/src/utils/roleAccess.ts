@@ -285,6 +285,9 @@ export function canAccessRoute(role: UserRole, path: string): boolean {
   if (role === UserRole.DRIVER) {
     // Driver UI is intentionally minimal: assigned orders + profile only.
     if (normalizedPath === 'profile') return true;
+    if (normalizedPath === 'logistics/orders/dispatch-board' || normalizedPath.startsWith('logistics/orders/dispatch-board/')) {
+      return false;
+    }
     if (normalizedPath === 'logistics/orders' || normalizedPath.startsWith('logistics/orders/')) return true;
     if (normalizedPath === 'logistics') return true;
     return false;

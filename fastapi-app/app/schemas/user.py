@@ -49,6 +49,7 @@ class UserCreate(BaseModel):
     timezone: Optional[str] = None
     country: Optional[str] = None
     role: LogisticsRole
+    drivers_license_number: Optional[str] = None
 
 
 class UserUpdate(BaseModel):

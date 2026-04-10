@@ -76,6 +76,14 @@ const VehiclesList: React.FC = () => {
     );
   }, [rows, searchTerm]);
 
+  const getVehicleDisplayName = (vehicle: UiVehicle): string => {
+    const vehicleName = (vehicle.make || '').trim();
+    if (vehicleName.length > 0) return vehicleName;
+    const composed = `${vehicle.make || ''} ${vehicle.model || ''}`.trim();
+    if (composed.length > 0) return composed;
+    return vehicle.id;
+  };
+
   return (
     <>
       <StandardCrudListLayout
@@ -157,12 +165,12 @@ const VehiclesList: React.FC = () => {
           }}
           columns={[
             {
-              key: 'vehicle_id',
-              header: 'vehicle_id',
+              key: 'vehicle_name',
+              header: 'vehicle_name',
               render: (vehicle) => (
                 <div className="flex items-center gap-2">
                   <Truck size={16} className="text-indigo-500" />
-                  <span className="text-sm font-medium text-gray-900">{vehicle.id}</span>
+                  <span className="text-sm font-medium text-gray-900">{getVehicleDisplayName(vehicle)}</span>
                 </div>
               ),
             },
@@ -188,6 +196,7 @@ const VehiclesList: React.FC = () => {
             {
               key: 'actions',
               header: 'actions',
+              align: 'right',
               render: (vehicle) => (
                 <div className="flex items-center justify-end gap-2">
                   <button

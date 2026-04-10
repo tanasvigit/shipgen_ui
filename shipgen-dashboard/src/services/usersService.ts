@@ -19,6 +19,7 @@ export interface UserInput {
   role: 'ADMIN' | 'OPERATIONS_MANAGER' | 'DISPATCHER' | 'DRIVER' | 'VIEWER';
   password?: string;
   status?: string;
+  drivers_license_number?: string;
 }
 
 const mapUser = (row: UnknownRecord): UiUser => ({
@@ -50,6 +51,7 @@ class UsersService {
       email: input.email,
       role: input.role,
       ...(input.password ? { password: input.password } : {}),
+      ...(input.drivers_license_number ? { drivers_license_number: input.drivers_license_number } : {}),
     });
     return mapUser((normalizeSingle<UnknownRecord>(payload, ['user']) ?? {}) as UnknownRecord);
   }
