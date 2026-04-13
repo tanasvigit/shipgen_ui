@@ -74,6 +74,7 @@ class DriversService {
     status?: string;
     online?: number;
     unassigned?: boolean;
+    in_use?: boolean;
   }): Promise<DriverListResult> {
     const query = new URLSearchParams({
       limit: String(params.pageSize),
@@ -82,6 +83,7 @@ class DriversService {
     if (params.status) query.set('status', params.status);
     if (params.online != null) query.set('online', String(params.online));
     if (params.unassigned) query.set('unassigned', 'true');
+    if (params.in_use) query.set('in_use', 'true');
     const payload = await apiClient.get<unknown>(`${DRIVERS_BASE_PATH}/?${query.toString()}`);
     const { rows, total } = parseFleetPaginatedResponse<BackendDriver>(payload, ['drivers']);
     const mapped = rows.map(mapBackendDriverToUi);

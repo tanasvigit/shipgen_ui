@@ -5,6 +5,11 @@ import { ordersService, orderCustomerLabel, UiOrder, UiOrderLifecycleEvent } fro
 import { Button } from '../ui/Button';
 import StatusBadge from '../ui/StatusBadge';
 import EntityLink from '../common/EntityLink';
+import RouteDetailsModal from '../common/RouteDetailsModal';
+import { driversService } from '../../services/driversService';
+import { vehiclesService } from '../../services/vehiclesService';
+import { UserRole } from '../../types';
+import { getStoredUserRole } from '../../utils/roleAccess';
 
 interface OrderDetailsModalProps {
   isOpen: boolean;
@@ -27,10 +32,18 @@ const formatDateTime = (value?: string) => {
 };
 
 const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, orderId, onClose }) => {
+  const role = getStoredUserRole() ?? UserRole.VIEWER;
+  const isFleetCustomer = role === UserRole.FLEET_CUSTOMER;
   const [order, setOrder] = useState<UiOrder | null>(null);
   const [lifecycle, setLifecycle] = useState<UiOrderLifecycleEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resolvedDriverName, setResolvedDriverName] = useState<string>('');
+  const [resolvedVehicleName, setResolvedVehicleName] = useState<string>('');
+  const [resolvedVehicleNumber, setResolvedVehicleNumber] = useState<string>('');
+  const [relatedDetailsPath, setRelatedDetailsPath] = useState<string | null>(null);
+  const [relatedDetailsTitle, setRelatedDetailsTitle] = useState<string>('Details');
+  const [relatedDetailsSubtitle, setRelatedDetailsSubtitle] = useState<string | undefined>(undefined);
 
   const load = async () => {
     if (!orderId || !isOpen) return;
@@ -59,9 +72,71 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, orderId, 
     void load();
   }, [isOpen, orderId]);
 
+  useEffect(() => {
+    let active = true;
+    const resolveAssignmentDetails = async () => {
+      const refs = ((order?.meta as unknown) as Record<string, unknown>) ?? {};
+      const driverId = String(order?.driver_assigned_uuid || refs.driver_uuid || refs.driver_id || '').trim();
+      const vehicleId = String(order?.vehicle_assigned_uuid || refs.vehicle_uuid || refs.vehicle_id || '').trim();
+
+      const initialDriverName = String(order?.driver_assigned_name ?? refs.driver_name ?? '').trim();
+      const initialVehicleName = String(order?.vehicle_assigned_name ?? refs.vehicle_name ?? '').trim();
+      const initialVehicleNumber = String(
+        order?.vehicle_assigned_number ?? refs.vehicle_number ?? refs.vehicle_plate ?? refs.plate_number ?? '',
+      ).trim();
+
+      if (active) {
+        setResolvedDriverName(initialDriverName);
+        setResolvedVehicleName(initialVehicleName);
+        setResolvedVehicleNumber(initialVehicleNumber);
+      }
+
+      if (!initialDriverName && driverId) {
+        try {
+          const driver = await driversService.getById(driverId);
+          if (active && driver.name?.trim()) setResolvedDriverName(driver.name.trim());
+        } catch {
+          // Keep fallback to id.
+        }
+      }
+
+      if (vehicleId && (!initialVehicleName || !initialVehicleNumber)) {
+        try {
+          const vehicle = await vehiclesService.getById(vehicleId);
+          const name = [vehicle.make?.trim(), vehicle.model?.trim()].filter(Boolean).join(' ').trim();
+          if (active) {
+            if (name) setResolvedVehicleName(name);
+            if (vehicle.plate_number?.trim()) setResolvedVehicleNumber(vehicle.plate_number.trim());
+          }
+        } catch {
+          // Keep fallback to id.
+        }
+      }
+    };
+
+    if (!order) {
+      setResolvedDriverName('');
+      setResolvedVehicleName('');
+      setResolvedVehicleNumber('');
+      return () => {
+        active = false;
+      };
+    }
+
+    void resolveAssignmentDetails();
+    return () => {
+      active = false;
+    };
+  }, [order]);
+
   const refs = ((order?.meta as unknown) as Record<string, unknown>) ?? {};
   const driverId = String(order?.driver_assigned_uuid || refs.driver_uuid || refs.driver_id || '');
   const vehicleId = String(order?.vehicle_assigned_uuid || refs.vehicle_uuid || refs.vehicle_id || '');
+  const driverName = resolvedDriverName || String(order?.driver_assigned_name ?? refs.driver_name ?? '').trim();
+  const vehicleName = resolvedVehicleName || String(order?.vehicle_assigned_name ?? refs.vehicle_name ?? '').trim();
+  const vehicleNumber =
+    resolvedVehicleNumber ||
+    String(order?.vehicle_assigned_number ?? refs.vehicle_number ?? refs.vehicle_plate ?? refs.plate_number ?? '').trim();
   const vendorId = String(refs.vendor_uuid ?? refs.vendor_id ?? '');
   const pickupPlaceId = String(refs.pickup_place_uuid ?? refs.pickup_place_id ?? '');
   const dropPlaceId = String(refs.drop_place_uuid ?? refs.drop_place_id ?? '');
@@ -69,6 +144,19 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, orderId, 
   const deliveryAddr = order?.meta?.delivery?.address?.trim() || String(order?.meta?.drop_location ?? '').trim();
   const goodsMeta = String(order?.meta?.goods_description ?? '').trim();
   const showGoodsBlock = Boolean(goodsMeta && goodsMeta !== String(order?.notes ?? '').trim());
+  const openRelatedDetails = (kind: 'driver' | 'vehicle', entityId?: string) => {
+    const value = String(entityId || '').trim();
+    if (!value) return;
+    if (kind === 'driver') {
+      setRelatedDetailsTitle('Driver Details');
+      setRelatedDetailsSubtitle(driverName || value);
+      setRelatedDetailsPath(`/fleet/drivers/${encodeURIComponent(value)}`);
+      return;
+    }
+    setRelatedDetailsTitle('Vehicle Details');
+    setRelatedDetailsSubtitle(`${vehicleName || value}${vehicleNumber ? ` (${vehicleNumber})` : ''}`);
+    setRelatedDetailsPath(`/fleet/vehicles/${encodeURIComponent(value)}`);
+  };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Order Details">
@@ -99,6 +187,17 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, orderId, 
               <div className="mt-1">
                 <StatusBadge label={order.status} variant={getStatusVariant(order.status)} />
               </div>
+            </div>
+            <div>
+              <label className="text-xs uppercase text-gray-500">Driver Name</label>
+              <p className="text-sm">{driverName || driverId || '-'}</p>
+            </div>
+            <div>
+              <label className="text-xs uppercase text-gray-500">Vehicle</label>
+              <p className="text-sm">
+                {vehicleName || vehicleId || '-'}
+                {vehicleNumber ? ` (${vehicleNumber})` : ''}
+              </p>
             </div>
             <div>
               <label className="text-xs uppercase text-gray-500">Type</label>
@@ -161,16 +260,68 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, orderId, 
             </div>
           ) : null}
 
-          <div>
-            <label className="text-xs uppercase text-gray-500">Related Links</label>
-            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-              <EntityLink id={driverId} label="Driver" to="/fleet/drivers" title="View Driver" />
-              <EntityLink id={vehicleId} label="Vehicle" to="/fleet/vehicles" title="View Vehicle" />
-              <EntityLink id={vendorId} label="Vendor" to="/fleet/vendors" title="View Vendor" />
-              <EntityLink id={pickupPlaceId} label="Pickup Place" to="/fleet/places" title="View Pickup Place" />
-              <EntityLink id={dropPlaceId} label="Drop Place" to="/fleet/places" title="View Drop Place" />
+          {isFleetCustomer ? (
+            driverName || vehicleName || vehicleNumber ? (
+              <div>
+                <label className="text-xs uppercase text-gray-500">Assignment</label>
+                <div className="mt-2 grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
+                  {driverName ? (
+                    <p className="text-gray-700">
+                      <span className="font-medium">Driver:</span> {driverName}
+                    </p>
+                  ) : null}
+                  {vehicleName || vehicleNumber ? (
+                    <p className="text-gray-700">
+                      <span className="font-medium">Vehicle:</span> {vehicleName || 'Vehicle'}
+                      {vehicleNumber ? ` (${vehicleNumber})` : ''}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            ) : null
+          ) : (
+            <div>
+              <label className="text-xs uppercase text-gray-500">Related Links</label>
+              <div className="mt-2 grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
+                <p className="text-gray-700">
+                  <span className="font-medium">Driver:</span> {driverName || driverId || '-'}
+                </p>
+                <p className="text-gray-700">
+                  <span className="font-medium">Vehicle:</span> {vehicleName || vehicleId || '-'}
+                  {vehicleNumber ? ` (${vehicleNumber})` : ''}
+                </p>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                {driverId ? (
+                  <button
+                    type="button"
+                    onClick={() => openRelatedDetails('driver', driverId)}
+                    className="text-blue-600 hover:underline cursor-pointer"
+                    title="View Driver"
+                  >
+                    Driver
+                  </button>
+                ) : (
+                  <span className="text-gray-500">Driver —</span>
+                )}
+                {vehicleId ? (
+                  <button
+                    type="button"
+                    onClick={() => openRelatedDetails('vehicle', vehicleId)}
+                    className="text-blue-600 hover:underline cursor-pointer"
+                    title="View Vehicle"
+                  >
+                    Vehicle
+                  </button>
+                ) : (
+                  <span className="text-gray-500">Vehicle —</span>
+                )}
+                <EntityLink id={vendorId} label="Vendor" to="/fleet/vendors" title="View Vendor" />
+                <EntityLink id={pickupPlaceId} label="Pickup Place" to="/fleet/places" title="View Pickup Place" />
+                <EntityLink id={dropPlaceId} label="Drop Place" to="/fleet/places" title="View Drop Place" />
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <label className="text-xs uppercase text-gray-500">Notes</label>
@@ -205,6 +356,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, orderId, 
           No order selected.
         </div>
       ) : null}
+      <RouteDetailsModal
+        isOpen={Boolean(relatedDetailsPath)}
+        onClose={() => setRelatedDetailsPath(null)}
+        title={relatedDetailsTitle}
+        routePath={relatedDetailsPath}
+        headerTitle={relatedDetailsTitle}
+        headerSubtitle={relatedDetailsSubtitle}
+      />
     </Modal>
   );
 };

@@ -65,13 +65,14 @@ const mapBackendVehicleToUi = (vehicle: BackendVehicle): UiVehicle => ({
 });
 
 class VehiclesService {
-  async list(params: { page: number; pageSize: number; status?: string; unassigned?: boolean }): Promise<VehicleListResult> {
+  async list(params: { page: number; pageSize: number; status?: string; unassigned?: boolean; in_use?: boolean }): Promise<VehicleListResult> {
     const query = new URLSearchParams({
       limit: String(params.pageSize),
       offset: String((params.page - 1) * params.pageSize),
     });
     if (params.status && params.status !== 'all') query.set('status', params.status);
     if (params.unassigned) query.set('unassigned', 'true');
+    if (params.in_use) query.set('in_use', 'true');
     const payload = await apiClient.get<unknown>(`${VEHICLES_BASE_PATH}/?${query.toString()}`);
     const { rows, total } = parseFleetPaginatedResponse<BackendVehicle>(payload, ['vehicles']);
     const mapped = rows.map(mapBackendVehicleToUi);

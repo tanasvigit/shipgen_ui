@@ -5,6 +5,7 @@ import { driversService, type UiDriver } from '../../services/driversService';
 import { vehiclesService, type UiVehicle } from '../../services/vehiclesService';
 import { canManageDriverVehicleMasterData, getStoredUserRole } from '../../utils/roleAccess';
 import { UserRole } from '../../types';
+import EntityLink from '../common/EntityLink';
 
 const VehicleDetail: React.FC = () => {
   const role = getStoredUserRole() ?? UserRole.VIEWER;
@@ -112,32 +113,91 @@ const VehicleDetail: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">Vehicle Information</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div><label className="text-xs text-gray-500 uppercase">vehicle_name</label><p className="text-sm font-medium">{getVehicleDisplayName(vehicle)}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">plate_number</label><p className="text-sm font-medium">{vehicle.plate_number}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">make</label><p className="text-sm font-medium">{vehicle.make}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">model</label><p className="text-sm font-medium">{vehicle.model}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">year</label><p className="text-sm font-medium">{vehicle.year}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">trim</label><p className="text-sm font-medium">{vehicle.trim}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">type</label><p className="text-sm font-medium">{vehicle.type}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">vin</label><p className="text-sm font-medium">{vehicle.vin}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">status</label><p className="text-sm font-medium">{vehicle.status}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">company_uuid</label><p className="text-sm font-medium break-all">{vehicle.company_uuid ?? 'null'}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">vendor_uuid</label><p className="text-sm font-medium break-all">{vehicle.vendor_uuid ?? 'null'}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">latitude</label><p className="text-sm font-medium">{vehicle.latitude ?? '—'}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">longitude</label><p className="text-sm font-medium">{vehicle.longitude ?? '—'}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">meta.color</label><p className="text-sm font-medium">{vehicle.meta?.color != null ? String(vehicle.meta.color) : '-'}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">meta.notes</label><p className="text-sm font-medium">{vehicle.meta?.notes != null ? String(vehicle.meta.notes) : '-'}</p></div>
-          <div><label className="text-xs text-gray-500 uppercase">updated_at</label><p className="text-sm font-medium">{vehicle.updated_at ?? '-'}</p></div>
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <label className="text-xs text-gray-500 uppercase">assigned_driver (driver.vehicle_uuid)</label>
-            <p className="text-sm font-medium break-all">
+            <h2 className="text-lg font-bold text-gray-900">Vehicle Profile</h2>
+            <p className="text-sm text-gray-500 mt-1">Identity, specifications, and assignment details</p>
+          </div>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              vehicle.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+            }`}
+          >
+            {vehicle.status || 'unknown'}
+          </span>
+        </div>
+
+        <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+          <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Vehicle Name</p>
+          <p className="text-base font-semibold text-gray-900">{getVehicleDisplayName(vehicle)}</p>
+          {vehicle.plate_number ? <p className="text-sm text-gray-600 mt-1">Plate: {vehicle.plate_number}</p> : null}
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">make</p>
+            <p className="text-sm font-medium text-gray-900">{vehicle.make || '-'}</p>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">model</p>
+            <p className="text-sm font-medium text-gray-900">{vehicle.model || '-'}</p>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">year</p>
+            <p className="text-sm font-medium text-gray-900">{vehicle.year || '-'}</p>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">trim</p>
+            <p className="text-sm font-medium text-gray-900">{vehicle.trim || '-'}</p>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">type</p>
+            <p className="text-sm font-medium text-gray-900">{vehicle.type || '-'}</p>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">vin</p>
+            <p className="text-sm font-medium text-gray-900">{vehicle.vin || '-'}</p>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">company_uuid</p>
+            <p className="text-sm font-medium text-gray-900 break-all text-right">{vehicle.company_uuid ?? 'null'}</p>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">vendor_uuid</p>
+            <p className="text-sm font-medium text-gray-900 break-all text-right">{vehicle.vendor_uuid ?? 'null'}</p>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">latitude</p>
+            <p className="text-sm font-medium text-gray-900">{vehicle.latitude ?? '—'}</p>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">longitude</p>
+            <p className="text-sm font-medium text-gray-900">{vehicle.longitude ?? '—'}</p>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">meta.color</p>
+            <p className="text-sm font-medium text-gray-900">{vehicle.meta?.color != null ? String(vehicle.meta.color) : '-'}</p>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">meta.notes</p>
+            <p className="text-sm font-medium text-gray-900">{vehicle.meta?.notes != null ? String(vehicle.meta.notes) : '-'}</p>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">updated_at</p>
+            <p className="text-sm font-medium text-gray-900">{vehicle.updated_at ?? '-'}</p>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">assigned_driver</p>
+            <p className="text-sm font-medium text-gray-900 break-all text-right">
               {assignedDriver ? (
-                <Link to={`/fleet/drivers/${encodeURIComponent(assignedDriver.id)}`} className="text-blue-600 hover:underline">
-                  {assignedDriver.id} — {assignedDriver.drivers_license_number || 'no license'}
-                </Link>
+                <EntityLink
+                  id={assignedDriver.id}
+                  label={`${assignedDriver.name || assignedDriver.id}${assignedDriver.drivers_license_number ? ` — ${assignedDriver.drivers_license_number}` : ''}`}
+                  to="/fleet/drivers"
+                  className="text-blue-600 hover:underline"
+                  title="View Driver"
+                />
               ) : (
                 'none'
               )}

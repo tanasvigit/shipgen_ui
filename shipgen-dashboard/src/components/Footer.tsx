@@ -15,7 +15,6 @@ const Footer: React.FC<FooterProps> = ({ variant = 'default' }) => {
               © {new Date().getFullYear()} ShipZen. All rights reserved.
             </p>
             <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4 sm:gap-6">
-              <Link to="/dashboard" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Dashboard</Link>
               <Link to="/logistics/orders" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Orders</Link>
               <Link to="/fleet/vehicles" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Fleet &amp; Operations</Link>
               <Link to="/analytics/reports" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Reports</Link>
@@ -70,12 +69,6 @@ const Footer: React.FC<FooterProps> = ({ variant = 'default' }) => {
           <p className="text-sm text-gray-400">
             © {new Date().getFullYear()} ShipZen. All rights reserved.
           </p>
-          <Link
-            to="/dashboard"
-            className="mt-4 sm:mt-0 px-4 py-2 text-sm font-semibold text-blue-400 hover:text-blue-300 transition-colors duration-300 hover:scale-105"
-          >
-            Dashboard →
-          </Link>
         </div>
       </div>
     </footer>

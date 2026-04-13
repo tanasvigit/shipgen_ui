@@ -27,6 +27,7 @@ const VehiclesList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(initialParams.get('status') ?? 'all');
   const [unassignedFilter, setUnassignedFilter] = useState(initialParams.get('unassigned') === 'true');
+  const [inUseFilter, setInUseFilter] = useState(initialParams.get('in_use') === 'true');
   const [page, setPage] = useState(1);
   const [listTotal, setListTotal] = useState(0);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -38,6 +39,7 @@ const VehiclesList: React.FC = () => {
     const params = new URLSearchParams(location.search);
     setStatusFilter(params.get('status') ?? 'all');
     setUnassignedFilter(params.get('unassigned') === 'true');
+    setInUseFilter(params.get('in_use') === 'true');
     setPage(1);
   }, [location.search]);
 
@@ -47,10 +49,11 @@ const VehiclesList: React.FC = () => {
       pageSize: PAGE_SIZE,
       status: statusFilter !== 'all' ? statusFilter : undefined,
       unassigned: unassignedFilter || undefined,
+      in_use: inUseFilter || undefined,
     });
     setListTotal(response.pagination?.total ?? 0);
     return response.data;
-  }, [page, statusFilter, unassignedFilter]);
+  }, [page, statusFilter, unassignedFilter, inUseFilter]);
 
   const { rows, loading, error, actionError, deleteWithConfirm, reload } = useListWithCrud<UiVehicle>(load, [load]);
 
@@ -92,7 +95,7 @@ const VehiclesList: React.FC = () => {
         createOnClick={canManageMasterData ? () => setIsCreateOpen(true) : undefined}
         createLabel={canManageMasterData ? 'New Vehicle' : undefined}
         filters={
-          <div className="grid max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="grid max-w-md grid-cols-1 gap-2 sm:grid-cols-3">
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -110,11 +113,26 @@ const VehiclesList: React.FC = () => {
                 type="checkbox"
                 checked={unassignedFilter}
                 onChange={(e) => {
-                  setUnassignedFilter(e.target.checked);
+                  const checked = e.target.checked;
+                  setUnassignedFilter(checked);
+                  if (checked) setInUseFilter(false);
                   setPage(1);
                 }}
               />
               Unassigned only
+            </label>
+            <label className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={inUseFilter}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setInUseFilter(checked);
+                  if (checked) setUnassignedFilter(false);
+                  setPage(1);
+                }}
+              />
+              In use only
             </label>
           </div>
         }
@@ -147,6 +165,7 @@ const VehiclesList: React.FC = () => {
               setSearchTerm('');
               setStatusFilter('all');
               setUnassignedFilter(false);
+              setInUseFilter(false);
               setPage(1);
             }}
             className="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"

@@ -111,6 +111,7 @@ def list_drivers(
     status_filter: str | None = Query(None, alias="status"),
     online: int | None = Query(None, ge=0, le=1),
     unassigned: bool = Query(False),
+    in_use: bool = Query(False),
     vehicle_uuid: str | None = Query(None, description="Filter drivers assigned to this vehicle uuid"),
 ):
     company_uuid = require_company_uuid(current)
@@ -122,21 +123,23 @@ def list_drivers(
         query = query.filter(Driver.status == status_filter)
     if online is not None:
         query = query.filter(Driver.online == online)
-    if unassigned:
-        active_order_for_driver = exists().where(
-            and_(
-                Order.company_uuid == company_uuid,
-                Order.deleted_at.is_(None),
-                Order.driver_assigned_uuid.isnot(None),
-                Order.driver_assigned_uuid != "",
-                Order.driver_assigned_uuid == Driver.uuid,
-                Order.status.notin_(list(TERMINAL_ORDER_STATUSES)),
-            )
+    active_order_for_driver = exists().where(
+        and_(
+            Order.company_uuid == company_uuid,
+            Order.deleted_at.is_(None),
+            Order.driver_assigned_uuid.isnot(None),
+            Order.driver_assigned_uuid != "",
+            Order.driver_assigned_uuid == Driver.uuid,
+            Order.status.notin_(list(TERMINAL_ORDER_STATUSES)),
         )
+    )
+    if unassigned:
         query = query.filter(
             or_(Driver.vehicle_uuid.is_(None), Driver.vehicle_uuid == ""),
             not_(active_order_for_driver),
         )
+    if in_use:
+        query = query.filter(active_order_for_driver)
     if vehicle_uuid:
         query = query.filter(Driver.vehicle_uuid == vehicle_uuid)
     total = query.count()

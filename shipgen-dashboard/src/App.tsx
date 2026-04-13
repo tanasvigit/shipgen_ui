@@ -21,7 +21,8 @@ import {
   Package,
   Sparkles,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  ArrowUp
 } from 'lucide-react';
 import AIAssistant from './components/AIAssistant';
 // Dashboard Sub-pages
@@ -146,6 +147,49 @@ const ScrollToTopOnRouteChange: React.FC = () => {
   }, [location.pathname, location.search]);
 
   return null;
+};
+
+const BackToTopButton: React.FC = () => {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const updateVisibility = () => {
+      const main = document.querySelector('main');
+      const mainScroll = main ? main.scrollTop : 0;
+      const winScroll = window.scrollY || document.documentElement.scrollTop || 0;
+      setVisible(mainScroll > 220 || winScroll > 220);
+    };
+
+    const main = document.querySelector('main');
+    window.addEventListener('scroll', updateVisibility, { passive: true });
+    main?.addEventListener('scroll', updateVisibility, { passive: true });
+    updateVisibility();
+
+    return () => {
+      window.removeEventListener('scroll', updateVisibility);
+      main?.removeEventListener('scroll', updateVisibility);
+    };
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    const main = document.querySelector('main');
+    main?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+  };
+
+  if (!visible) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={scrollToTop}
+      aria-label="Back to top"
+      title="Back to top"
+      className="fixed bottom-6 right-6 z-50 rounded-full bg-blue-600 p-3 text-white shadow-lg transition hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+    >
+      <ArrowUp size={18} />
+    </button>
+  );
 };
 
 const Sidebar: React.FC<{ isOpen: boolean; setIsOpen: (v: boolean) => void; onLogout: () => void; currentUser: User | null }> = ({ isOpen, setIsOpen, onLogout, currentUser }) => {
@@ -598,6 +642,7 @@ const App: React.FC = () => {
     <ToastProvider>
       <Router>
         <ScrollToTopOnRouteChange />
+        <BackToTopButton />
         <Routes>
         <Route path="/" element={<Navigate to={(localStorage.getItem('token') || localStorage.getItem('accessToken')) ? '/dashboard' : '/login'} replace />} />
         <Route

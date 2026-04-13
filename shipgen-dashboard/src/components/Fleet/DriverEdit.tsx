@@ -10,7 +10,7 @@ const DriverEdit: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-4">
-        <Link to={`/fleet/drivers/${id}`} className="p-2 hover:bg-gray-100 rounded-lg transition">
+        <Link to="/fleet/drivers" className="p-2 hover:bg-gray-100 rounded-lg transition">
           <ArrowLeft size={20} />
         </Link>
         <div>

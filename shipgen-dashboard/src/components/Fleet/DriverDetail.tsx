@@ -14,6 +14,7 @@ const DriverDetail: React.FC = () => {
   const [driver, setDriver] = useState<UiDriver | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const driverDisplayName = (driver?.name || '').trim() || driver?.drivers_license_number || driver?.id || '-';
 
   useEffect(() => {
     if (id) {
@@ -71,7 +72,7 @@ const DriverDetail: React.FC = () => {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Driver Details</h1>
-          <p className="text-sm text-gray-600 mt-1">{driver.id}</p>
+          <p className="text-sm text-gray-600 mt-1">{driverDisplayName}</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
           {canManageMasterData && !isEmbedded ? (
@@ -96,58 +97,68 @@ const DriverDetail: React.FC = () => {
         </div>
       ) : null}
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">Driver Information</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <label className="text-xs text-gray-500 uppercase mb-1 block">id</label>
-            <p className="text-sm font-medium text-gray-900">{driver.id}</p>
+            <h2 className="text-lg font-bold text-gray-900">Driver Profile</h2>
+            <p className="text-sm text-gray-500 mt-1">Operational identity and assignment metadata</p>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 uppercase flex items-center space-x-1 mb-1">
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              driver.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+            }`}
+          >
+            {driver.status || 'unknown'}
+          </span>
+        </div>
+
+        <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+          <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Driver Name</p>
+          <p className="text-base font-semibold text-gray-900">{driverDisplayName}</p>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500 flex items-center gap-1">
               <User size={12} />
-              <span>drivers_license_number</span>
-            </label>
-            <p className="text-sm font-medium text-gray-900">{driver.drivers_license_number}</p>
+              drivers_license_number
+            </p>
+            <p className="text-sm font-medium text-gray-900">{driver.drivers_license_number || '-'}</p>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 uppercase mb-1 block">status</label>
-            <p className="text-sm font-medium text-gray-900">{driver.status}</p>
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 uppercase mb-1 block">online</label>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">online</p>
             <p className="text-sm font-medium text-gray-900">{driver.online === 1 ? 'online' : 'offline'}</p>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 uppercase mb-1 block">company_uuid</label>
-            <p className="text-sm font-medium text-gray-900 break-all">{driver.company_uuid ?? 'null'}</p>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">company_uuid</p>
+            <p className="text-sm font-medium text-gray-900 break-all text-right">{driver.company_uuid ?? 'null'}</p>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 uppercase mb-1 block">user_uuid</label>
-            <p className="text-sm font-medium text-gray-900 break-all">{driver.user_uuid ?? 'null'}</p>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">user_uuid</p>
+            <p className="text-sm font-medium text-gray-900 break-all text-right">{driver.user_uuid ?? 'null'}</p>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 uppercase mb-1 block">latitude</label>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">latitude</p>
             <p className="text-sm font-medium text-gray-900">{driver.latitude != null ? String(driver.latitude) : '-'}</p>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 uppercase mb-1 block">longitude</label>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">longitude</p>
             <p className="text-sm font-medium text-gray-900">{driver.longitude != null ? String(driver.longitude) : '-'}</p>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 uppercase mb-1 block">heading</label>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">heading</p>
             <p className="text-sm font-medium text-gray-900">{driver.heading ?? '-'}</p>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 uppercase mb-1 block">speed</label>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">speed</p>
             <p className="text-sm font-medium text-gray-900">{driver.speed ?? '-'}</p>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 uppercase mb-1 block">altitude</label>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">altitude</p>
             <p className="text-sm font-medium text-gray-900">{driver.altitude ?? '-'}</p>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 uppercase mb-1 block">updated_at</label>
+          <div className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-500">updated_at</p>
             <p className="text-sm font-medium text-gray-900">{driver.updated_at ?? '-'}</p>
           </div>
         </div>

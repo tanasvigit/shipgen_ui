@@ -7,6 +7,7 @@ import { dashboardOverviewService, type DashboardOverviewData } from '../../serv
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { applyRangeToOverview, type DashboardRange } from '../../utils/dashboardHelpers';
 import { orderCustomerLabel, type UiOrder } from '../../services/ordersService';
+import EntityLink from '../common/EntityLink';
 
 const DashboardOverview: React.FC = () => {
   const [overview, setOverview] = useState<DashboardOverviewData | null>(null);
@@ -347,17 +348,25 @@ const DashboardOverview: React.FC = () => {
                   </div>
                   <p className="text-sm font-medium text-gray-900">
                     {driverId ? (
-                      <Link to={`/fleet/drivers/${encodeURIComponent(driverId)}`} title="View Driver" className="text-blue-600 hover:underline cursor-pointer">
-                        {String(report.driver_name ?? driverId)}
-                      </Link>
+                      <EntityLink
+                        id={driverId}
+                        label={String(report.driver_name ?? driverId)}
+                        to="/fleet/drivers"
+                        title="View Driver"
+                        className="text-blue-600 hover:underline cursor-pointer"
+                      />
                     ) : (
                       String(report.driver_name ?? '—')
                     )}{' '}
                     •{' '}
                     {vehicleId ? (
-                      <Link to={`/fleet/vehicles/${encodeURIComponent(vehicleId)}`} title="View Vehicle" className="text-blue-600 hover:underline cursor-pointer">
-                        {String(report.vehicle_name ?? vehicleId)}
-                      </Link>
+                      <EntityLink
+                        id={vehicleId}
+                        label={String(report.vehicle_name ?? vehicleId)}
+                        to="/fleet/vehicles"
+                        title="View Vehicle"
+                        className="text-blue-600 hover:underline cursor-pointer"
+                      />
                     ) : (
                       String(report.vehicle_name ?? '—')
                     )}

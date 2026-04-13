@@ -30,6 +30,7 @@ const DriversList: React.FC = () => {
     initialParams.get('online') === '1' ? '1' : 'all'
   );
   const [unassignedFilter, setUnassignedFilter] = useState(initialParams.get('unassigned') === 'true');
+  const [inUseFilter, setInUseFilter] = useState(initialParams.get('in_use') === 'true');
   const [page, setPage] = useState(1);
   const [listTotal, setListTotal] = useState(0);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -41,6 +42,7 @@ const DriversList: React.FC = () => {
     setStatusFilter(params.get('status') ?? '');
     setOnlineFilter(params.get('online') === '1' ? '1' : 'all');
     setUnassignedFilter(params.get('unassigned') === 'true');
+    setInUseFilter(params.get('in_use') === 'true');
     setPage(1);
   }, [location.search]);
 
@@ -51,10 +53,11 @@ const DriversList: React.FC = () => {
       status: statusFilter || undefined,
       online: onlineFilter === '1' ? 1 : undefined,
       unassigned: unassignedFilter || undefined,
+      in_use: inUseFilter || undefined,
     });
     setListTotal(response.pagination?.total ?? 0);
     return response.data;
-  }, [page, statusFilter, onlineFilter, unassignedFilter]);
+  }, [page, statusFilter, onlineFilter, unassignedFilter, inUseFilter]);
 
   const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
 
@@ -87,7 +90,7 @@ const DriversList: React.FC = () => {
         createHref={canManageMasterData ? '/analytics/users?create=1&role=DRIVER' : undefined}
         createLabel={canManageMasterData ? 'Create Driver User' : undefined}
         filters={
-          <div className="grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-4">
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -117,11 +120,26 @@ const DriversList: React.FC = () => {
                 type="checkbox"
                 checked={unassignedFilter}
                 onChange={(e) => {
-                  setUnassignedFilter(e.target.checked);
+                  const checked = e.target.checked;
+                  setUnassignedFilter(checked);
+                  if (checked) setInUseFilter(false);
                   setPage(1);
                 }}
               />
               Unassigned only
+            </label>
+            <label className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={inUseFilter}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setInUseFilter(checked);
+                  if (checked) setUnassignedFilter(false);
+                  setPage(1);
+                }}
+              />
+              In use only
             </label>
           </div>
         }
@@ -156,6 +174,7 @@ const DriversList: React.FC = () => {
               setStatusFilter('');
               setOnlineFilter('all');
               setUnassignedFilter(false);
+              setInUseFilter(false);
             }}
             className="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
           >

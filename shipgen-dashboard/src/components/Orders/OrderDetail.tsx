@@ -4,12 +4,14 @@ import {
   Calendar, ArrowLeft, AlertCircle, Edit
 } from 'lucide-react';
 import { driversService, UiDriver } from '../../services/driversService';
+import { vehiclesService } from '../../services/vehiclesService';
 import { ordersService, orderCustomerLabel, UiOrder, UiOrderLifecycleEvent } from '../../services/ordersService';
 import { Skeleton } from '../ui/LoadingSkeleton';
 import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
 import StatusBadge from '../ui/StatusBadge';
 import EntityLink from '../common/EntityLink';
+import RouteDetailsModal from '../common/RouteDetailsModal';
 import SelectField from '../ui/SelectField';
 import { useToast } from '../ui/ToastProvider';
 import { UserRole } from '../../types';
@@ -21,6 +23,7 @@ const OrderDetail: React.FC = () => {
   const isStaffAssign = canAssignOrDispatchOrders(role);
   const isDriver = role === UserRole.DRIVER;
   const isViewer = role === UserRole.VIEWER;
+  const isFleetCustomer = role === UserRole.FLEET_CUSTOMER;
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<UiOrder | null>(null);
   const [drivers, setDrivers] = useState<UiDriver[]>([]);
@@ -36,12 +39,74 @@ const OrderDetail: React.FC = () => {
   const [exceptionReport, setExceptionReport] = useState('');
   const [exceptionPriority, setExceptionPriority] = useState('medium');
   const [reassignDriverId, setReassignDriverId] = useState('');
+  const [resolvedDriverName, setResolvedDriverName] = useState<string>('');
+  const [resolvedVehicleName, setResolvedVehicleName] = useState<string>('');
+  const [resolvedVehicleNumber, setResolvedVehicleNumber] = useState<string>('');
+  const [relatedDetailsPath, setRelatedDetailsPath] = useState<string | null>(null);
+  const [relatedDetailsTitle, setRelatedDetailsTitle] = useState<string>('Details');
+  const [relatedDetailsSubtitle, setRelatedDetailsSubtitle] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (id) {
       void loadOrder();
     }
   }, [id]);
+
+  useEffect(() => {
+    let active = true;
+    const resolveAssignmentDetails = async () => {
+      setResolvedDriverName('');
+      setResolvedVehicleName('');
+      setResolvedVehicleNumber('');
+      if (!order) return;
+
+      const meta = ((order.meta as unknown) as Record<string, unknown>) ?? {};
+      const initialDriverName =
+        String(order.driver_assigned_name ?? '').trim() || String(meta.driver_name ?? '').trim();
+      const initialVehicleName =
+        String(order.vehicle_assigned_name ?? '').trim() || String(meta.vehicle_name ?? '').trim();
+      const initialVehicleNumber =
+        String(order.vehicle_assigned_number ?? '').trim() ||
+        String(meta.vehicle_number ?? meta.vehicle_plate ?? meta.plate_number ?? '').trim();
+
+      if (active) {
+        setResolvedDriverName(initialDriverName);
+        setResolvedVehicleName(initialVehicleName);
+        setResolvedVehicleNumber(initialVehicleNumber);
+      }
+
+      if (!initialDriverName && order.driver_assigned_uuid) {
+        const fromLoadedDrivers = drivers.find((d) => d.id === order.driver_assigned_uuid);
+        if (fromLoadedDrivers?.name?.trim()) {
+          if (active) setResolvedDriverName(fromLoadedDrivers.name.trim());
+        } else {
+          try {
+            const driver = await driversService.getById(order.driver_assigned_uuid);
+            if (active && driver.name?.trim()) setResolvedDriverName(driver.name.trim());
+          } catch {
+            // Keep fallback UUID rendering in UI.
+          }
+        }
+      }
+
+      if (order.vehicle_assigned_uuid && (!initialVehicleName || !initialVehicleNumber)) {
+        try {
+          const vehicle = await vehiclesService.getById(order.vehicle_assigned_uuid);
+          const name = [vehicle.make?.trim(), vehicle.model?.trim()].filter(Boolean).join(' ').trim();
+          if (active) {
+            if (name) setResolvedVehicleName(name);
+            if (vehicle.plate_number?.trim()) setResolvedVehicleNumber(vehicle.plate_number.trim());
+          }
+        } catch {
+          // Keep fallback UUID rendering in UI.
+        }
+      }
+    };
+    void resolveAssignmentDetails();
+    return () => {
+      active = false;
+    };
+  }, [order, drivers]);
 
   const loadOrder = async () => {
     try {
@@ -239,6 +304,21 @@ const OrderDetail: React.FC = () => {
   const deliveryAddr = order.meta?.delivery?.address?.trim() || String(order.meta?.drop_location ?? '').trim();
   const goodsMeta = String(order.meta?.goods_description ?? '').trim();
   const showGoodsBlock = Boolean(goodsMeta && goodsMeta !== (order.notes || '').trim());
+  const openRelatedDetails = (kind: 'driver' | 'vehicle', entityId?: string) => {
+    const value = String(entityId || '').trim();
+    if (!value) return;
+    if (kind === 'driver') {
+      setRelatedDetailsTitle('Driver Details');
+      setRelatedDetailsSubtitle(resolvedDriverName || value);
+      setRelatedDetailsPath(`/fleet/drivers/${encodeURIComponent(value)}`);
+      return;
+    }
+    setRelatedDetailsTitle('Vehicle Details');
+    setRelatedDetailsSubtitle(
+      `${resolvedVehicleName || value}${resolvedVehicleNumber ? ` (${resolvedVehicleNumber})` : ''}`,
+    );
+    setRelatedDetailsPath(`/fleet/vehicles/${encodeURIComponent(value)}`);
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -273,6 +353,17 @@ const OrderDetail: React.FC = () => {
                 ) : null}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Driver Name</label>
+                  <p className="text-sm text-gray-900">{resolvedDriverName || order.driver_assigned_uuid || '—'}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Vehicle</label>
+                  <p className="text-sm text-gray-900">
+                    {resolvedVehicleName || order.vehicle_assigned_uuid || '—'}
+                    {resolvedVehicleNumber ? ` (${resolvedVehicleNumber})` : ''}
+                  </p>
+                </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500 uppercase">Status</label>
                   <div className="mt-1">
@@ -321,26 +412,61 @@ const OrderDetail: React.FC = () => {
                 <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Notes</label>
                 <p className="text-sm text-gray-900 whitespace-pre-wrap">{order.notes || '—'}</p>
               </div>
-              <div>
-                <label className="text-xs font-medium text-gray-500 uppercase mb-2 block">Related Links</label>
-                <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-                  <EntityLink
-                    id={order.driver_assigned_uuid || driverId}
-                    label="Driver"
-                    to="/fleet/drivers"
-                    title="View Driver"
-                  />
-                  <EntityLink
-                    id={order.vehicle_assigned_uuid || vehicleId}
-                    label="Vehicle"
-                    to="/fleet/vehicles"
-                    title="View Vehicle"
-                  />
-                  <EntityLink id={vendorId} label="Vendor" to="/fleet/vendors" title="View Vendor" />
-                  <EntityLink id={pickupPlaceId} label="Pickup Place" to="/fleet/places" title="View Pickup Place" />
-                  <EntityLink id={dropPlaceId} label="Drop Place" to="/fleet/places" title="View Drop Place" />
+              {isFleetCustomer ? (
+                resolvedDriverName || resolvedVehicleName || resolvedVehicleNumber ? (
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase mb-2 block">Assignment</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      {resolvedDriverName ? (
+                        <p className="text-gray-800">
+                          <span className="font-medium">Driver:</span> {resolvedDriverName}
+                        </p>
+                      ) : null}
+                      {resolvedVehicleName || resolvedVehicleNumber ? (
+                        <p className="text-gray-800">
+                          <span className="font-medium">Vehicle:</span> {resolvedVehicleName || 'Vehicle'}
+                          {resolvedVehicleNumber ? ` (${resolvedVehicleNumber})` : ''}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null
+              ) : (
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase mb-2 block">Related Links</label>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                    {order.driver_assigned_uuid || driverId ? (
+                      <button
+                        type="button"
+                        onClick={() => openRelatedDetails('driver', order.driver_assigned_uuid || driverId)}
+                        className="text-blue-600 hover:underline cursor-pointer"
+                        title="View Driver"
+                      >
+                        {resolvedDriverName || 'Driver'}
+                      </button>
+                    ) : (
+                      <span className="text-gray-500">Driver —</span>
+                    )}
+                    {order.vehicle_assigned_uuid || vehicleId ? (
+                      <button
+                        type="button"
+                        onClick={() => openRelatedDetails('vehicle', order.vehicle_assigned_uuid || vehicleId)}
+                        className="text-blue-600 hover:underline cursor-pointer"
+                        title="View Vehicle"
+                      >
+                        {resolvedVehicleName
+                          ? `${resolvedVehicleName}${resolvedVehicleNumber ? ` (${resolvedVehicleNumber})` : ''}`
+                          : 'Vehicle'}
+                      </button>
+                    ) : (
+                      <span className="text-gray-500">Vehicle —</span>
+                    )}
+                    <EntityLink id={vendorId} label="Vendor" to="/fleet/vendors" title="View Vendor" />
+                    <EntityLink id={pickupPlaceId} label="Pickup Place" to="/fleet/places" title="View Pickup Place" />
+                    <EntityLink id={dropPlaceId} label="Drop Place" to="/fleet/places" title="View Drop Place" />
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Created At</label>
@@ -485,6 +611,14 @@ const OrderDetail: React.FC = () => {
           </div>
         </div>
       </div>
+      <RouteDetailsModal
+        isOpen={Boolean(relatedDetailsPath)}
+        onClose={() => setRelatedDetailsPath(null)}
+        title={relatedDetailsTitle}
+        routePath={relatedDetailsPath}
+        headerTitle={relatedDetailsTitle}
+        headerSubtitle={relatedDetailsSubtitle}
+      />
     </div>
   );
 };

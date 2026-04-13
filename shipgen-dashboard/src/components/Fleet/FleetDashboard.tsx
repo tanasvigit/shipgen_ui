@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Loader2 } from 'lucide-react';
 import PageContainer from '../ui/PageContainer';
 import { ResponsiveTable } from '../ui/ResponsiveTable';
@@ -9,6 +9,7 @@ import {
   type FleetDashboardDriverRow,
   type FleetDashboardVehicleRow,
 } from '../../services/fleetDashboardService';
+import EntityLink from '../common/EntityLink';
 
 function KpiCard({
   label,
@@ -108,7 +109,7 @@ const FleetDashboard: React.FC = () => {
         <KpiCard
           label="Drivers on active orders"
           value={kpis.drivers_on_active_orders}
-          onClick={() => navigate('/logistics/orders')}
+          onClick={() => navigate('/fleet/drivers?in_use=true')}
         />
         <KpiCard
           label="Unassigned drivers"
@@ -124,7 +125,7 @@ const FleetDashboard: React.FC = () => {
         <KpiCard
           label="Vehicles in use"
           value={kpis.vehicles_in_use}
-          onClick={() => navigate('/logistics/orders?vehicle_assigned=true')}
+          onClick={() => navigate('/fleet/vehicles?in_use=true')}
         />
         <KpiCard
           label="Unassigned vehicles"
@@ -151,12 +152,13 @@ const FleetDashboard: React.FC = () => {
                 key: 'id',
                 header: 'Driver Name',
                 render: (d) => (
-                  <Link
-                    to={`/fleet/drivers/${encodeURIComponent(d.driver_uuid)}`}
+                  <EntityLink
+                    id={d.driver_uuid}
+                    label={d.driver_name || d.public_id || d.driver_uuid}
+                    to="/fleet/drivers"
                     className="text-sm font-medium text-blue-600 hover:underline"
-                  >
-                    {d.driver_name || d.public_id || d.driver_uuid}
-                  </Link>
+                    title="View Driver"
+                  />
                 ),
               },
               {
@@ -177,17 +179,18 @@ const FleetDashboard: React.FC = () => {
                 render: (d) => (
                   <span className="text-sm text-gray-700">
                     {d.vehicle_uuid ? (
-                      <Link
-                        to={`/fleet/vehicles/${encodeURIComponent(d.vehicle_uuid)}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {(() => {
+                      <EntityLink
+                        id={d.vehicle_uuid}
+                        label={(() => {
                           const name = (d.vehicle_name || '').trim();
                           const plate = (d.vehicle_plate || '').trim();
                           if (name && plate) return `${name} (${plate})`;
                           return name || plate || d.vehicle_uuid;
                         })()}
-                      </Link>
+                        to="/fleet/vehicles"
+                        className="text-blue-600 hover:underline"
+                        title="View Vehicle"
+                      />
                     ) : (
                       '—'
                     )}
@@ -211,12 +214,13 @@ const FleetDashboard: React.FC = () => {
                 key: 'vehicle_name',
                 header: 'Vehicle Name',
                 render: (v) => (
-                  <Link
-                    to={`/fleet/vehicles/${encodeURIComponent(v.vehicle_uuid)}`}
+                  <EntityLink
+                    id={v.vehicle_uuid}
+                    label={v.vehicle_name || v.plate_number || v.vehicle_uuid}
+                    to="/fleet/vehicles"
                     className="text-sm font-medium text-blue-600 hover:underline"
-                  >
-                    {v.vehicle_name || v.plate_number || v.vehicle_uuid}
-                  </Link>
+                    title="View Vehicle"
+                  />
                 ),
               },
               {
@@ -234,12 +238,13 @@ const FleetDashboard: React.FC = () => {
                 header: 'Assigned driver',
                 render: (v) =>
                   v.assigned_driver_uuid ? (
-                    <Link
-                      to={`/fleet/drivers/${encodeURIComponent(v.assigned_driver_uuid)}`}
+                    <EntityLink
+                      id={v.assigned_driver_uuid}
+                      label={v.assigned_driver_name || v.assigned_driver_uuid}
+                      to="/fleet/drivers"
                       className="text-sm text-blue-600 hover:underline"
-                    >
-                      {v.assigned_driver_name || v.assigned_driver_uuid}
-                    </Link>
+                      title="View Driver"
+                    />
                   ) : (
                     <span className="text-sm text-gray-500">—</span>
                   ),

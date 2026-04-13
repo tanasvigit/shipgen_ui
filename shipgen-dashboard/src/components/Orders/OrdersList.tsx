@@ -208,6 +208,8 @@ const OrdersList: React.FC = () => {
         title: 'Related',
         render: (order) => {
           const refs = getOrderRefs(order);
+          const isFleetCustomer = role === UserRole.FLEET_CUSTOMER;
+          if (isFleetCustomer) return null;
           return (
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
               <EntityLink id={refs.driverId} label="Driver" to="/fleet/drivers" title="View Driver" />

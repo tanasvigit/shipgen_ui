@@ -19,7 +19,10 @@ export interface UiOrder {
   created_by?: string;
   created_by_display_name?: string;
   driver_assigned_uuid?: string;
+  driver_assigned_name?: string;
   vehicle_assigned_uuid?: string;
+  vehicle_assigned_name?: string;
+  vehicle_assigned_number?: string;
   meta: {
     customer_name: string;
     priority: string;
@@ -61,6 +64,21 @@ interface BackendOrder {
   created_by_display_name?: string | null;
   driver_assigned_uuid?: string | null;
   vehicle_assigned_uuid?: string | null;
+  driver?: {
+    uuid?: string | null;
+    public_id?: string | null;
+    user_uuid?: string | null;
+    name?: string | null;
+    status?: string | null;
+  } | null;
+  vehicle?: {
+    uuid?: string | null;
+    public_id?: string | null;
+    make?: string | null;
+    model?: string | null;
+    plate_number?: string | null;
+    status?: string | null;
+  } | null;
   pod_required?: boolean | null;
   meta?: Record<string, unknown> | null;
   options?: Record<string, unknown> | null;
@@ -155,6 +173,12 @@ const mapBackendOrderToUi = (order: BackendOrder): UiOrder => {
     meta.goods_description != null && String(meta.goods_description).trim()
       ? String(meta.goods_description)
       : undefined;
+  const driver = order.driver ?? {};
+  const vehicle = order.vehicle ?? {};
+  const vehicleName = [String(vehicle.make ?? '').trim(), String(vehicle.model ?? '').trim()]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
 
   return {
     id: String(order.uuid ?? order.public_id ?? order.id ?? ''),
@@ -169,7 +193,10 @@ const mapBackendOrderToUi = (order: BackendOrder): UiOrder => {
     created_by: order.created_by ? String(order.created_by) : undefined,
     created_by_display_name: order.created_by_display_name ? String(order.created_by_display_name) : undefined,
     driver_assigned_uuid: String(order.driver_assigned_uuid ?? ''),
+    driver_assigned_name: String(driver.name ?? '').trim() || undefined,
     vehicle_assigned_uuid: String(order.vehicle_assigned_uuid ?? ''),
+    vehicle_assigned_name: vehicleName || undefined,
+    vehicle_assigned_number: String(vehicle.plate_number ?? '').trim() || undefined,
     meta: {
       ...meta,
       customer_name: String(meta.customer_name ?? ''),

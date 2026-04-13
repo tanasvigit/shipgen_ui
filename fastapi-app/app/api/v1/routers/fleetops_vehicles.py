@@ -57,6 +57,7 @@ def list_vehicles(
     offset: int = Query(0, ge=0),
     status_filter: str | None = Query(None, alias="status"),
     unassigned: bool = Query(False),
+    in_use: bool = Query(False),
 ):
     company_uuid = require_company_uuid(current)
     query = db.query(Vehicle).filter(
@@ -65,6 +66,16 @@ def list_vehicles(
     )
     if status_filter:
         query = query.filter(Vehicle.status == status_filter)
+    active_order_for_vehicle = exists().where(
+        and_(
+            Order.company_uuid == company_uuid,
+            Order.deleted_at.is_(None),
+            Order.vehicle_assigned_uuid.isnot(None),
+            Order.vehicle_assigned_uuid != "",
+            Order.vehicle_assigned_uuid == Vehicle.uuid,
+            Order.status.notin_(list(TERMINAL_ORDER_STATUSES)),
+        )
+    )
     if unassigned:
         has_assigned_driver = exists().where(
             and_(
@@ -73,17 +84,9 @@ def list_vehicles(
                 Driver.vehicle_uuid == Vehicle.uuid,
             )
         )
-        active_order_for_vehicle = exists().where(
-            and_(
-                Order.company_uuid == company_uuid,
-                Order.deleted_at.is_(None),
-                Order.vehicle_assigned_uuid.isnot(None),
-                Order.vehicle_assigned_uuid != "",
-                Order.vehicle_assigned_uuid == Vehicle.uuid,
-                Order.status.notin_(list(TERMINAL_ORDER_STATUSES)),
-            )
-        )
         query = query.filter(not_(has_assigned_driver), not_(active_order_for_vehicle))
+    if in_use:
+        query = query.filter(active_order_for_vehicle)
     total = query.count()
     vehicles = query.offset(offset).limit(limit).all()
     return VehiclesListResponse(
@@ -227,6 +230,12 @@ def assign_driver(
     driver = _get_driver_for_company(db, company_uuid=company_uuid, driver_id=driver_uuid)
     if not driver:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found.")
+
+    if driver.vehicle_uuid and driver.vehicle_uuid != vehicle.uuid:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Driver is already assigned to another vehicle.",
+        )
 
     driver.vehicle_uuid = vehicle.uuid
     db.add(driver)

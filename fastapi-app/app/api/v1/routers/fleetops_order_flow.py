@@ -184,21 +184,31 @@ def _pick_vehicle(db: Session, current: User, req: AssignOrderRequest, driver: D
 
     # When driver already has a mapped vehicle, enforce valid pair.
     if driver.vehicle_uuid and driver.vehicle_uuid != vehicle.uuid:
-        raise HTTPException(status_code=409, detail="Selected vehicle does not match driver assignment.")
+        raise HTTPException(
+            status_code=409,
+            detail="Driver is already assigned to another vehicle. Unassign or select the mapped vehicle.",
+        )
 
-    in_use = (
+    # Enforce one vehicle per driver across active orders.
+    active_driver_order_on_other_vehicle = (
         db.query(Order)
         .filter(
             Order.company_uuid == current.company_uuid,
             Order.deleted_at.is_(None),
-            Order.vehicle_assigned_uuid == vehicle.uuid,
+            Order.driver_assigned_uuid == driver.uuid,
+            Order.vehicle_assigned_uuid.isnot(None),
+            Order.vehicle_assigned_uuid != "",
+            Order.vehicle_assigned_uuid != vehicle.uuid,
             Order.uuid != order_uuid,
             Order.status.notin_(["completed", "cancelled", "failed"]),
         )
         .first()
     )
-    if in_use:
-        raise HTTPException(status_code=409, detail="Vehicle is already assigned to an active order.")
+    if active_driver_order_on_other_vehicle:
+        raise HTTPException(
+            status_code=409,
+            detail="Driver is already assigned to another vehicle on an active order.",
+        )
 
     return vehicle
 
