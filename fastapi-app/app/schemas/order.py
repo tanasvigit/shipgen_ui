@@ -11,6 +11,10 @@ class OrderBase(BaseModel):
     internal_id: Optional[str] = None
     customer_uuid: Optional[str] = None
     customer_type: Optional[str] = None
+    created_by: Optional[str] = None
+    created_by_display_name: Optional[str] = Field(
+        default=None, description="Resolved from User in API responses; not persisted on Order row."
+    )
     customer_display_name: Optional[str] = Field(
         default=None, description="Resolved from Contact in API responses; not persisted on Order row."
     )

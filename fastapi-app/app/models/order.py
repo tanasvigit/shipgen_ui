@@ -18,6 +18,7 @@ class Order(Base):
     internal_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     customer_uuid: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     customer_type: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(36), index=True, nullable=True)
     driver_assigned_uuid: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     vehicle_assigned_uuid: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     meta: Mapped[Optional[dict]] = mapped_column(JSON)

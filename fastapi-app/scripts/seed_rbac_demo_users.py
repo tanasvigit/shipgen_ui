@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create (or update) five demo users—one per logistics RBAC role—for manual UI/API testing.
+Create (or update) demo users—one per logistics RBAC role—for manual UI/API testing.
 
 Prerequisites:
   - Database running and migrated (including 0017_user_role_rbac for users.role).
@@ -36,6 +36,7 @@ DEMO_ACCOUNTS: list[tuple[str, str, str]] = [
     ("dispatcher@demo.local", "DISPATCHER", "Demo Dispatcher"),
     ("driver@demo.local", "DRIVER", "Demo Driver"),
     ("viewer@demo.local", "VIEWER", "Demo Viewer"),
+    ("fleet.customer@demo.local", "FLEET_CUSTOMER", "Demo Fleet Customer"),
 ]
 
 

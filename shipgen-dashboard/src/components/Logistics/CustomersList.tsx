@@ -15,6 +15,7 @@ import {
   canMutateCustomers,
   getStoredUserRole,
 } from '../../utils/roleAccess';
+import { getApiErrorMessage } from '../../services/apiErrors';
 
 const pageSize = 20;
 
@@ -68,7 +69,7 @@ const CustomersList: React.FC = () => {
       setRows(res.data);
       setHasMore(res.data.length === pageSize);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to load customers');
+      setError(getApiErrorMessage(e, 'Failed to load customers'));
       setRows([]);
     } finally {
       setLoading(false);
@@ -87,7 +88,7 @@ const CustomersList: React.FC = () => {
       setDeleteId(null);
       await load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      setError(getApiErrorMessage(e, 'Delete failed'));
     } finally {
       setDeleting(false);
     }

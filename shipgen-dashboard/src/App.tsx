@@ -510,7 +510,10 @@ const App: React.FC = () => {
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const roleFallbackPath = currentUser?.role === UserRole.DRIVER ? '/logistics/orders' : '/dashboard';
+  const roleFallbackPath =
+    currentUser?.role === UserRole.DRIVER || currentUser?.role === UserRole.FLEET_CUSTOMER
+      ? '/logistics/orders'
+      : '/dashboard';
 
   useEffect(() => {
     if (APP_MODE.disableAuth) {

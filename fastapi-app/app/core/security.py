@@ -39,10 +39,20 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a hash."""
+    if not hashed_password:
+        return False
+    hp = hashed_password.strip()
+    # Prefer native bcrypt for $2a/$2b/$2y hashes — avoids passlib + bcrypt 4.x
+    # compatibility issues on verify (passlib may mis-handle some backends).
+    if hp.startswith("$2"):
+        try:
+            if _verify_password_bcrypt(plain_password, hp):
+                return True
+        except Exception:
+            pass
     try:
         return pwd_context.verify(plain_password, hashed_password)
     except Exception:
-        # Fallback to direct bcrypt if passlib fails
         return _verify_password_bcrypt(plain_password, hashed_password)
 
 

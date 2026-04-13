@@ -50,7 +50,7 @@ class ContactsService {
     if (params.kind) query.set('kind', params.kind);
     if (params.search?.trim()) query.set('search', params.search.trim());
     const payload = await apiClient.get<ListResponse<BackendContact>>(
-      `${CONTACTS_BASE_PATH}/`,
+      CONTACTS_BASE_PATH,
       Object.fromEntries(query.entries()) as Record<string, string>,
     );
     const rows = normalizeList<BackendContact>(payload, ['contacts']);
@@ -64,7 +64,7 @@ class ContactsService {
   }
 
   async create(input: Record<string, unknown>): Promise<MockContact> {
-    const payload = await apiClient.post<unknown>(`${CONTACTS_BASE_PATH}/`, input);
+    const payload = await apiClient.post<unknown>(CONTACTS_BASE_PATH, input);
     return mapBackendContactToUi((normalizeSingle<BackendContact>(payload, ['contact']) ?? {}) as BackendContact);
   }
 

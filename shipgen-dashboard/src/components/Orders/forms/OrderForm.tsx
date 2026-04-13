@@ -5,6 +5,8 @@ import { PH, SELECT_PH } from '../../../constants/formPlaceholders';
 import { FormActions, FormContainer, FormField, FormSection, Input, Select, Textarea } from '../../common/form';
 import LocationInput, { type LocationValue } from './LocationInput';
 import CustomerSelector from '../../Logistics/CustomerSelector';
+import { UserRole } from '../../../types';
+import { getStoredUserRole } from '../../../utils/roleAccess';
 
 interface OrderFormProps {
   mode: 'create' | 'edit';
@@ -14,6 +16,7 @@ interface OrderFormProps {
 }
 
 const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCancel }) => {
+  const isFleetCustomer = getStoredUserRole() === UserRole.FLEET_CUSTOMER;
   const emptyLocation: LocationValue = { address: '', lat: null, lng: null };
   const sameLocationTolerance = 0.0001;
   const [loading, setLoading] = useState(mode === 'edit');
@@ -112,7 +115,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
     setLocationErrors(nextErrors);
     if (nextErrors.pickup || nextErrors.delivery) return;
 
-    if (mode === 'create' && !customerUuid.trim()) {
+    if (mode === 'create' && !isFleetCustomer && !customerUuid.trim()) {
       setCustomerError('Select a customer.');
       return;
     }
@@ -201,17 +204,19 @@ const OrderForm: React.FC<OrderFormProps> = ({ mode, orderId, onSuccess, onCance
               <option value="delivery">delivery</option>
             </Select>
           </FormField>
-          <CustomerSelector
-            value={customerUuid}
-            initialLabel={customerLabel}
-            required
-            error={customerError}
-            onChange={(uuid, name) => {
-              setCustomerUuid(uuid);
-              setCustomerLabel(name);
-              setCustomerError(null);
-            }}
-          />
+          {!isFleetCustomer && (
+            <CustomerSelector
+              value={customerUuid}
+              initialLabel={customerLabel}
+              required
+              error={customerError}
+              onChange={(uuid, name) => {
+                setCustomerUuid(uuid);
+                setCustomerLabel(name);
+                setCustomerError(null);
+              }}
+            />
+          )}
           <FormField className="md:col-span-2" label="Scheduled At" required htmlFor="order-scheduled">
             <Input
               id="order-scheduled"

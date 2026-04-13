@@ -1,6 +1,7 @@
 import { apiClient } from './apiClient';
 import { normalizeList, normalizeSingle } from './baseService';
 import type { ListResponse, PaginatedResponse } from '../types/api';
+import { UserRole } from '../types';
 
 export interface UiOrder {
   id: string;
@@ -14,6 +15,9 @@ export interface UiOrder {
   customer_uuid?: string;
   /** API-enriched display name (preferred over meta.customer_name). */
   customer_display_name?: string;
+  /** User uuid when order was placed by a fleet customer (or other user). */
+  created_by?: string;
+  created_by_display_name?: string;
   driver_assigned_uuid?: string;
   vehicle_assigned_uuid?: string;
   meta: {
@@ -29,6 +33,10 @@ export interface UiOrder {
       lat: number | null;
       lng: number | null;
     };
+    goods_description?: string;
+    pickup_location?: string;
+    drop_location?: string;
+    source?: string;
     [key: string]: unknown;
   };
   options: {
@@ -49,6 +57,8 @@ interface BackendOrder {
   status?: string | null;
   customer_uuid?: string | null;
   customer_display_name?: string | null;
+  created_by?: string | null;
+  created_by_display_name?: string | null;
   driver_assigned_uuid?: string | null;
   vehicle_assigned_uuid?: string | null;
   pod_required?: boolean | null;
@@ -70,6 +80,7 @@ export interface UiOrderLifecycleEvent {
 }
 
 const ORDERS_BASE_PATH = '/fleetops/v1/orders';
+const CUSTOMER_ORDERS_BASE_PATH = '/orders';
 const MAX_ORDERS_LIMIT = 100;
 
 const toIsoOrEmpty = (value?: string | null): string => {
@@ -80,12 +91,70 @@ const toIsoOrEmpty = (value?: string | null): string => {
 
 const normalizeStatus = (status?: string | null): string => {
   if (!status) return 'created';
-  return status.toLowerCase();
+  const s = status.toLowerCase();
+  if (s === 'order_created') return 'created';
+  return s;
+};
+
+const getStoredRole = (): UserRole | null => {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('user');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { role?: string };
+    return (parsed.role?.toUpperCase() as UserRole) || null;
+  } catch {
+    return null;
+  }
+};
+
+const isFleetCustomer = (): boolean => getStoredRole() === UserRole.FLEET_CUSTOMER;
+const shouldFallbackToCustomerOrders = (err: unknown): boolean => {
+  const msg = err instanceof Error ? err.message : String(err ?? '');
+  return msg.includes('Fleet customers can only use /orders endpoints');
+};
+const listUrlForBasePath = (basePath: string, query: string): string =>
+  basePath === CUSTOMER_ORDERS_BASE_PATH ? `${basePath}?${query}` : `${basePath}/?${query}`;
+
+const mapPickupFromMeta = (meta: Record<string, unknown>) => {
+  if (meta.pickup && typeof meta.pickup === 'object') {
+    const p = meta.pickup as Record<string, unknown>;
+    return {
+      address: String(p.address ?? ''),
+      lat: p.lat == null ? null : Number(p.lat),
+      lng: p.lng == null ? null : Number(p.lng),
+    };
+  }
+  if (meta.pickup_location != null && String(meta.pickup_location).trim()) {
+    return { address: String(meta.pickup_location), lat: null as number | null, lng: null as number | null };
+  }
+  return undefined;
+};
+
+const mapDeliveryFromMeta = (meta: Record<string, unknown>) => {
+  if (meta.delivery && typeof meta.delivery === 'object') {
+    const p = meta.delivery as Record<string, unknown>;
+    return {
+      address: String(p.address ?? ''),
+      lat: p.lat == null ? null : Number(p.lat),
+      lng: p.lng == null ? null : Number(p.lng),
+    };
+  }
+  if (meta.drop_location != null && String(meta.drop_location).trim()) {
+    return { address: String(meta.drop_location), lat: null as number | null, lng: null as number | null };
+  }
+  return undefined;
 };
 
 const mapBackendOrderToUi = (order: BackendOrder): UiOrder => {
   const meta = (order.meta ?? {}) as Record<string, unknown>;
   const options = (order.options ?? {}) as Record<string, unknown>;
+  const pickup = mapPickupFromMeta(meta);
+  const delivery = mapDeliveryFromMeta(meta);
+  const goods =
+    meta.goods_description != null && String(meta.goods_description).trim()
+      ? String(meta.goods_description)
+      : undefined;
 
   return {
     id: String(order.uuid ?? order.public_id ?? order.id ?? ''),
@@ -97,39 +166,17 @@ const mapBackendOrderToUi = (order: BackendOrder): UiOrder => {
     status: normalizeStatus(order.status),
     customer_uuid: order.customer_uuid ? String(order.customer_uuid) : undefined,
     customer_display_name: order.customer_display_name ? String(order.customer_display_name) : undefined,
+    created_by: order.created_by ? String(order.created_by) : undefined,
+    created_by_display_name: order.created_by_display_name ? String(order.created_by_display_name) : undefined,
     driver_assigned_uuid: String(order.driver_assigned_uuid ?? ''),
     vehicle_assigned_uuid: String(order.vehicle_assigned_uuid ?? ''),
     meta: {
+      ...meta,
       customer_name: String(meta.customer_name ?? ''),
       priority: String(meta.priority ?? 'normal'),
-      pickup:
-        meta.pickup && typeof meta.pickup === 'object'
-          ? {
-              address: String((meta.pickup as Record<string, unknown>).address ?? ''),
-              lat:
-                (meta.pickup as Record<string, unknown>).lat == null
-                  ? null
-                  : Number((meta.pickup as Record<string, unknown>).lat),
-              lng:
-                (meta.pickup as Record<string, unknown>).lng == null
-                  ? null
-                  : Number((meta.pickup as Record<string, unknown>).lng),
-            }
-          : undefined,
-      delivery:
-        meta.delivery && typeof meta.delivery === 'object'
-          ? {
-              address: String((meta.delivery as Record<string, unknown>).address ?? ''),
-              lat:
-                (meta.delivery as Record<string, unknown>).lat == null
-                  ? null
-                  : Number((meta.delivery as Record<string, unknown>).lat),
-              lng:
-                (meta.delivery as Record<string, unknown>).lng == null
-                  ? null
-                  : Number((meta.delivery as Record<string, unknown>).lng),
-            }
-          : undefined,
+      pickup,
+      delivery,
+      goods_description: goods,
     },
     options: {
       pod_required: Boolean(options.pod_required ?? order.pod_required ?? false),
@@ -143,7 +190,8 @@ const mapBackendOrderToUi = (order: BackendOrder): UiOrder => {
 export function orderCustomerLabel(order: UiOrder): string {
   const fromMeta = String(order.meta?.customer_name ?? '').trim();
   const resolved = String(order.customer_display_name ?? '').trim();
-  return resolved || fromMeta || '—';
+  const creator = String(order.created_by_display_name ?? '').trim();
+  return resolved || fromMeta || creator || '—';
 }
 
 class OrdersService {
@@ -174,7 +222,21 @@ class OrdersService {
       query.set('end_date', params.end_date);
     }
 
-    const payload = await apiClient.get<ListResponse<BackendOrder>>(`${ORDERS_BASE_PATH}/?${query.toString()}`);
+    const basePath = isFleetCustomer() ? CUSTOMER_ORDERS_BASE_PATH : ORDERS_BASE_PATH;
+    let payload: ListResponse<BackendOrder>;
+    try {
+      payload = await apiClient.get<ListResponse<BackendOrder>>(
+        listUrlForBasePath(basePath, query.toString()),
+      );
+    } catch (err) {
+      if (basePath === ORDERS_BASE_PATH && shouldFallbackToCustomerOrders(err)) {
+        payload = await apiClient.get<ListResponse<BackendOrder>>(
+          listUrlForBasePath(CUSTOMER_ORDERS_BASE_PATH, query.toString()),
+        );
+      } else {
+        throw err;
+      }
+    }
     const rows = normalizeList<BackendOrder>(payload, ['orders']);
     const mapped = rows.map(mapBackendOrderToUi);
     if (import.meta.env.DEV) {
@@ -196,13 +258,30 @@ class OrdersService {
   }
 
   async getById(id: string): Promise<UiOrder> {
-    const payload = await apiClient.get<unknown>(`${ORDERS_BASE_PATH}/${id}`);
+    const basePath = isFleetCustomer() ? CUSTOMER_ORDERS_BASE_PATH : ORDERS_BASE_PATH;
+    let payload: unknown;
+    try {
+      payload = await apiClient.get<unknown>(`${basePath}/${id}`);
+    } catch (err) {
+      if (basePath === ORDERS_BASE_PATH && shouldFallbackToCustomerOrders(err)) {
+        payload = await apiClient.get<unknown>(`${CUSTOMER_ORDERS_BASE_PATH}/${id}`);
+      } else {
+        throw err;
+      }
+    }
     const row = normalizeSingle<BackendOrder>(payload, ['order']);
     return mapBackendOrderToUi((row ?? {}) as BackendOrder);
   }
 
   async create(input: Omit<UiOrder, 'id' | 'created_at' | 'updated_at'>): Promise<UiOrder> {
-    const payload = await apiClient.post<unknown>(`${ORDERS_BASE_PATH}/`, {
+    const customerPayload = {
+      internal_id: input.internal_id?.trim() || null,
+      pickup_location: String(input.meta?.pickup?.address ?? '').trim() || 'Unknown pickup',
+      drop_location: String(input.meta?.delivery?.address ?? '').trim() || 'Unknown drop',
+      goods_description:
+        String(input.notes || '').trim() || String(input.internal_id || '').trim() || 'Order request',
+    };
+    const staffPayload = {
       customer_uuid: input.customer_uuid ?? null,
       type: input.type,
       internal_id: input.internal_id || null,
@@ -210,7 +289,21 @@ class OrdersService {
       scheduled_at: input.scheduled_at || null,
       meta: input.meta ?? {},
       options: input.options ?? {},
-    });
+    };
+    let payload: unknown;
+    if (isFleetCustomer()) {
+      payload = await apiClient.post<unknown>(`${CUSTOMER_ORDERS_BASE_PATH}`, customerPayload);
+    } else {
+      try {
+        payload = await apiClient.post<unknown>(`${ORDERS_BASE_PATH}/`, staffPayload);
+      } catch (err) {
+        if (shouldFallbackToCustomerOrders(err)) {
+          payload = await apiClient.post<unknown>(`${CUSTOMER_ORDERS_BASE_PATH}`, customerPayload);
+        } else {
+          throw err;
+        }
+      }
+    }
     const row = normalizeSingle<BackendOrder>(payload, ['order']);
     return mapBackendOrderToUi((row ?? {}) as BackendOrder);
   }

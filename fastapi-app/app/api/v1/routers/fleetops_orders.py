@@ -12,6 +12,7 @@ from app.core.roles import (
     ADMIN,
     DRIVER,
     DISPATCHER,
+    FLEET_CUSTOMER,
     OPERATIONS_MANAGER,
     effective_user_role,
     require_roles,
@@ -34,6 +35,14 @@ def _require_company_uuid(current: User) -> str:
     return current.company_uuid
 
 
+def _deny_fleet_customer_access(current: User) -> None:
+    if effective_user_role(current) == FLEET_CUSTOMER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Fleet customers can only use /orders endpoints.",
+        )
+
+
 def _driver_uuid_for_user(db: Session, current: User) -> str | None:
     if not current.uuid or not current.company_uuid:
         return None
@@ -50,12 +59,13 @@ def _driver_uuid_for_user(db: Session, current: User) -> str | None:
 
 
 def _apply_driver_order_filters(query, db: Session, current: User):
-    if effective_user_role(current) != DRIVER:
-        return query
-    du = _driver_uuid_for_user(db, current)
-    if not du:
-        return query.filter(false())
-    return query.filter(Order.driver_assigned_uuid == du)
+    role = effective_user_role(current)
+    if role == DRIVER:
+        du = _driver_uuid_for_user(db, current)
+        if not du:
+            return query.filter(false())
+        return query.filter(Order.driver_assigned_uuid == du)
+    return query
 
 
 def _get_scoped_order(db: Session, current: User, order_id: str) -> Order:
@@ -114,7 +124,7 @@ def _customer_name_map(db: Session, company_uuid: str, uuids: List[str]) -> dict
 
 
 def _display_name_for_order(db: Session, company_uuid: str, order: Order) -> str | None:
-    """Prefer linked customer; fall back to legacy meta.customer_name only when present."""
+    """Prefer linked customer; meta.customer_name; then placing user (fleet customer) name."""
     if order.customer_uuid:
         names = _customer_name_map(db, company_uuid, [order.customer_uuid])
         n = names.get(order.customer_uuid)
@@ -125,14 +135,38 @@ def _display_name_for_order(db: Session, company_uuid: str, order: Order) -> str
         legacy = meta.get("customer_name")
         if legacy:
             return str(legacy)
+    if order.created_by:
+        u = (
+            db.query(User)
+            .filter(User.uuid == order.created_by, User.company_uuid == company_uuid, User.deleted_at.is_(None))
+            .first()
+        )
+        if u:
+            label = (u.name or u.email or "").strip()
+            if label:
+                return label
     return None
+
+
+def _creator_display_name(db: Session, company_uuid: str, order: Order) -> str | None:
+    if not order.created_by:
+        return None
+    u = (
+        db.query(User)
+        .filter(User.uuid == order.created_by, User.company_uuid == company_uuid, User.deleted_at.is_(None))
+        .first()
+    )
+    if not u:
+        return None
+    return (u.name or u.email or "").strip() or None
 
 
 def _enrich_order_out(db: Session, current: User, order: Order) -> OrderOut:
     base = OrderOut.model_validate(order)
     company_uuid = _require_company_uuid(current)
     display = _display_name_for_order(db, company_uuid, order)
-    return base.model_copy(update={"customer_display_name": display})
+    creator = _creator_display_name(db, company_uuid, order)
+    return base.model_copy(update={"customer_display_name": display, "created_by_display_name": creator})
 
 
 def _order_response(db: Session, current: User, order: Order) -> OrderResponse:
@@ -150,6 +184,7 @@ def list_orders(
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
 ):
+    _deny_fleet_customer_access(current)
     company_uuid = _require_company_uuid(current)
     query = db.query(Order).filter(
         Order.deleted_at.is_(None),
@@ -171,6 +206,17 @@ def list_orders(
             .all()
             if r[0]
         ]
+        creator_uuids: list[str] = [
+            str(r[0])
+            for r in db.query(User.uuid)
+            .filter(
+                User.company_uuid == company_uuid,
+                User.deleted_at.is_(None),
+                or_(User.name.ilike(q), User.email.ilike(q)),
+            )
+            .all()
+            if r[0]
+        ]
         search_conds = [
             Order.internal_id.ilike(q),
             Order.public_id.ilike(q),
@@ -180,6 +226,8 @@ def list_orders(
         ]
         if customer_uuids:
             search_conds.append(Order.customer_uuid.in_(customer_uuids))
+        if creator_uuids:
+            search_conds.append(Order.created_by.in_(creator_uuids))
         query = query.filter(or_(*search_conds))
 
     def _parse_iso(value: str | None) -> datetime | None:
@@ -203,7 +251,8 @@ def list_orders(
     for o in orders:
         base = OrderOut.model_validate(o)
         disp = _display_name_for_order(db, company_uuid, o)
-        out.append(base.model_copy(update={"customer_display_name": disp}))
+        creator = _creator_display_name(db, company_uuid, o)
+        out.append(base.model_copy(update={"customer_display_name": disp, "created_by_display_name": creator}))
     return {"orders": out}
 
 
@@ -213,6 +262,7 @@ def get_order(
     db: Session = Depends(get_db),
     current: User = Depends(_get_current_user),
 ):
+    _deny_fleet_customer_access(current)
     order = _get_scoped_order(db, current, order_id)
     return _order_response(db, current, order)
 
@@ -407,6 +457,7 @@ def get_distance_and_time(
     db: Session = Depends(get_db),
     current: User = Depends(_get_current_user),
 ):
+    _deny_fleet_customer_access(current)
     order = _get_scoped_order(db, current, order_id)
     return {"distance": order.distance, "time": order.time}
 
@@ -417,6 +468,7 @@ def get_eta(
     db: Session = Depends(get_db),
     current: User = Depends(_get_current_user),
 ):
+    _deny_fleet_customer_access(current)
     order = _get_scoped_order(db, current, order_id)
     return {
         "order_uuid": order.uuid,
@@ -431,6 +483,7 @@ def tracker_data(
     db: Session = Depends(get_db),
     current: User = Depends(_get_current_user),
 ):
+    _deny_fleet_customer_access(current)
     order = _get_scoped_order(db, current, order_id)
     return {
         "order_uuid": order.uuid,

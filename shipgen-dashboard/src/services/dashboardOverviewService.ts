@@ -1,5 +1,6 @@
 import { apiClient } from './apiClient';
 import { normalizeList } from './baseService';
+import { UserRole } from '../types';
 
 type GenericRecord = Record<string, unknown>;
 
@@ -22,6 +23,17 @@ export interface DashboardOverviewData {
 }
 
 const asArray = (value: unknown): GenericRecord[] => (Array.isArray(value) ? (value as GenericRecord[]) : []);
+const isFleetCustomerSession = (): boolean => {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem('user');
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { role?: string };
+    return (parsed.role || '').toUpperCase() === UserRole.FLEET_CUSTOMER;
+  } catch {
+    return false;
+  }
+};
 
 class DashboardOverviewService {
   private inferCollectionKey(payload: Record<string, unknown>): string | null {
@@ -76,6 +88,17 @@ class DashboardOverviewService {
   }
 
   async fetchOverview(): Promise<DashboardOverviewData> {
+    if (isFleetCustomerSession()) {
+      return {
+        orders: [],
+        drivers: [],
+        vehicles: [],
+        issues: [],
+        fuelReports: [],
+        moduleCounts: [],
+        backendLimitations: ['Dashboard metrics are not available for fleet customer accounts.'],
+      };
+    }
     const [ordersRes, driversRes, vehiclesRes, issuesRes, fuelReportsRes] = await Promise.all([
       this.fetchAll<GenericRecord>('/fleetops/v1/orders', 'orders'),
       this.fetchAll<GenericRecord>('/fleetops/v1/drivers', 'drivers'),

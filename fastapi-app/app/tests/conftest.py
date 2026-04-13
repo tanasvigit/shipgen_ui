@@ -25,6 +25,7 @@ from app.models import (
     Place,
     Notification,
     TwoFaSession,
+    Trip,
 )
 from app.core.security import get_password_hash, create_access_token
 

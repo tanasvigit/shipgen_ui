@@ -37,10 +37,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, orderId, 
     try {
       setLoading(true);
       setError(null);
-      const [orderResponse, lifecycleResponse] = await Promise.all([
-        ordersService.getById(orderId),
-        ordersService.lifecycle(orderId),
-      ]);
+      const orderResponse = await ordersService.getById(orderId);
+      // Do not block the whole modal if lifecycle endpoint fails.
+      let lifecycleResponse: UiOrderLifecycleEvent[] = [];
+      try {
+        lifecycleResponse = await ordersService.lifecycle(orderId);
+      } catch {
+        lifecycleResponse = [];
+      }
       setOrder(orderResponse);
       setLifecycle(lifecycleResponse);
     } catch (err: any) {
@@ -61,6 +65,10 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, orderId, 
   const vendorId = String(refs.vendor_uuid ?? refs.vendor_id ?? '');
   const pickupPlaceId = String(refs.pickup_place_uuid ?? refs.pickup_place_id ?? '');
   const dropPlaceId = String(refs.drop_place_uuid ?? refs.drop_place_id ?? '');
+  const pickupAddr = order?.meta?.pickup?.address?.trim() || String(order?.meta?.pickup_location ?? '').trim();
+  const deliveryAddr = order?.meta?.delivery?.address?.trim() || String(order?.meta?.drop_location ?? '').trim();
+  const goodsMeta = String(order?.meta?.goods_description ?? '').trim();
+  const showGoodsBlock = Boolean(goodsMeta && goodsMeta !== String(order?.notes ?? '').trim());
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Order Details">
@@ -79,6 +87,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, orderId, 
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
+              <label className="text-xs uppercase text-gray-500">Internal ID</label>
+              <p className="text-sm">{order.internal_id || '-'}</p>
+            </div>
+            <div>
+              <label className="text-xs uppercase text-gray-500">Public ID</label>
+              <p className="text-sm">{order.public_id || '-'}</p>
+            </div>
+            <div>
               <label className="text-xs uppercase text-gray-500">Status</label>
               <div className="mt-1">
                 <StatusBadge label={order.status} variant={getStatusVariant(order.status)} />
@@ -91,6 +107,10 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, orderId, 
             <div>
               <label className="text-xs uppercase text-gray-500">Customer</label>
               <p className="text-sm">{orderCustomerLabel(order)}</p>
+            </div>
+            <div>
+              <label className="text-xs uppercase text-gray-500">Placed By</label>
+              <p className="text-sm">{order.created_by_display_name || order.created_by || '-'}</p>
             </div>
             <div>
               <label className="text-xs uppercase text-gray-500">Priority</label>
@@ -107,7 +127,39 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ isOpen, orderId, 
               <label className="text-xs uppercase text-gray-500">POD Required</label>
               <p className="text-sm">{order.options?.pod_required ? 'Yes' : 'No'}</p>
             </div>
+            <div>
+              <label className="text-xs uppercase text-gray-500">Name</label>
+              <p className="text-sm">{orderCustomerLabel(order)}</p>
+            </div>
+            <div>
+              <label className="text-xs uppercase text-gray-500">Created At</label>
+              <p className="text-sm">{formatDateTime(order.created_at)}</p>
+            </div>
+            <div>
+              <label className="text-xs uppercase text-gray-500">Updated At</label>
+              <p className="text-sm">{formatDateTime(order.updated_at)}</p>
+            </div>
           </div>
+
+          {(pickupAddr || deliveryAddr) && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="text-xs uppercase text-gray-500">Pickup</label>
+                <p className="text-sm whitespace-pre-wrap">{pickupAddr || '-'}</p>
+              </div>
+              <div>
+                <label className="text-xs uppercase text-gray-500">Delivery</label>
+                <p className="text-sm whitespace-pre-wrap">{deliveryAddr || '-'}</p>
+              </div>
+            </div>
+          )}
+
+          {showGoodsBlock ? (
+            <div>
+              <label className="text-xs uppercase text-gray-500">Goods / Service</label>
+              <p className="text-sm whitespace-pre-wrap">{goodsMeta}</p>
+            </div>
+          ) : null}
 
           <div>
             <label className="text-xs uppercase text-gray-500">Related Links</label>

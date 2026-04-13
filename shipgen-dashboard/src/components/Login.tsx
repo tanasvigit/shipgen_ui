@@ -19,6 +19,7 @@ const DEMO_ACCOUNTS: { role: string; email: string; displayLabel?: string }[] = 
   { role: 'DISPATCHER', email: 'dispatcher@demo.local' },
   { role: 'DRIVER', email: 'driver@demo.local' },
   { role: 'VIEWER', email: 'viewer@demo.local', displayLabel: 'VIEWER (Read-only)' },
+  { role: 'FLEET_CUSTOMER', email: 'fleet.customer@demo.local', displayLabel: 'FLEET CUSTOMER' },
 ];
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -31,10 +32,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const getRedirectPath = () => {
+  const getRedirectPath = (role: UserRole) => {
     const params = new URLSearchParams(location.search);
     const redirect = params.get('redirect');
-    return redirect ? decodeURIComponent(redirect) : '/dashboard';
+    if (redirect) return decodeURIComponent(redirect);
+    if (role === UserRole.DRIVER || role === UserRole.FLEET_CUSTOMER) return '/logistics/orders';
+    return '/dashboard';
   };
 
   const handleLogin = async () => {
@@ -74,7 +77,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
       
       onLogin(appUser);
-      navigate(getRedirectPath(), { replace: true });
+      navigate(getRedirectPath(appUser.role), { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

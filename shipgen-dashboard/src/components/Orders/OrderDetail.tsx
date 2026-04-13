@@ -49,9 +49,8 @@ const OrderDetail: React.FC = () => {
       setError(null);
       const r = getStoredUserRole() ?? UserRole.VIEWER;
       const needDrivers = r !== UserRole.DRIVER;
-      const [orderResponse, lifecycleResponse, driverResponse] = await Promise.all([
+      const [orderResponse, driverResponse] = await Promise.all([
         ordersService.getById(id!),
-        ordersService.lifecycle(id!),
         needDrivers
           ? driversService.list({ page: 1, pageSize: 100, status: 'active' })
           : Promise.resolve({
@@ -59,6 +58,12 @@ const OrderDetail: React.FC = () => {
               pagination: { total: 0, page: 1, pageSize: 100 },
             }),
       ]);
+      let lifecycleResponse: UiOrderLifecycleEvent[] = [];
+      try {
+        lifecycleResponse = await ordersService.lifecycle(id!);
+      } catch {
+        lifecycleResponse = [];
+      }
       setOrder(orderResponse);
       setLifecycle(lifecycleResponse);
       setDrivers(driverResponse.data);
@@ -71,10 +76,13 @@ const OrderDetail: React.FC = () => {
   };
 
   const refreshOrder = async () => {
-    const [orderResponse, lifecycleResponse] = await Promise.all([
-      ordersService.getById(id!),
-      ordersService.lifecycle(id!),
-    ]);
+    const orderResponse = await ordersService.getById(id!);
+    let lifecycleResponse: UiOrderLifecycleEvent[] = [];
+    try {
+      lifecycleResponse = await ordersService.lifecycle(id!);
+    } catch {
+      lifecycleResponse = [];
+    }
     setOrder(orderResponse);
     setLifecycle(lifecycleResponse);
     setAssignDriverId(orderResponse.driver_assigned_uuid || '');
@@ -227,6 +235,10 @@ const OrderDetail: React.FC = () => {
   const pickupPlaceId = String(refs.pickup_place_uuid ?? refs.pickup_place_id ?? '');
   const dropPlaceId = String(refs.drop_place_uuid ?? refs.drop_place_id ?? '');
   const hasAssignment = Boolean(order.driver_assigned_uuid && order.vehicle_assigned_uuid);
+  const pickupAddr = order.meta?.pickup?.address?.trim() || String(order.meta?.pickup_location ?? '').trim();
+  const deliveryAddr = order.meta?.delivery?.address?.trim() || String(order.meta?.drop_location ?? '').trim();
+  const goodsMeta = String(order.meta?.goods_description ?? '').trim();
+  const showGoodsBlock = Boolean(goodsMeta && goodsMeta !== (order.notes || '').trim());
 
   return (
     <div className="p-6 space-y-6">
@@ -253,6 +265,12 @@ const OrderDetail: React.FC = () => {
                   <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Customer</label>
                   <p className="text-sm text-gray-900">{orderCustomerLabel(order)}</p>
                 </div>
+                {order.created_by_display_name ? (
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Placed by</label>
+                    <p className="text-sm text-gray-900">{order.created_by_display_name}</p>
+                  </div>
+                ) : null}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -281,6 +299,24 @@ const OrderDetail: React.FC = () => {
                   <p className="text-sm text-gray-900">{order.options?.pod_required ? 'Yes' : 'No'}</p>
                 </div>
               </div>
+              {(pickupAddr || deliveryAddr) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Pickup</label>
+                    <p className="text-sm text-gray-900 whitespace-pre-wrap">{pickupAddr || '—'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Delivery</label>
+                    <p className="text-sm text-gray-900 whitespace-pre-wrap">{deliveryAddr || '—'}</p>
+                  </div>
+                </div>
+              )}
+              {showGoodsBlock ? (
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Goods / service</label>
+                  <p className="text-sm text-gray-900 whitespace-pre-wrap">{goodsMeta}</p>
+                </div>
+              ) : null}
               <div>
                 <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Notes</label>
                 <p className="text-sm text-gray-900 whitespace-pre-wrap">{order.notes || '—'}</p>
@@ -288,8 +324,18 @@ const OrderDetail: React.FC = () => {
               <div>
                 <label className="text-xs font-medium text-gray-500 uppercase mb-2 block">Related Links</label>
                 <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-                  <EntityLink id={driverId} label="Driver" to="/fleet/drivers" title="View Driver" />
-                  <EntityLink id={vehicleId} label="Vehicle" to="/fleet/vehicles" title="View Vehicle" />
+                  <EntityLink
+                    id={order.driver_assigned_uuid || driverId}
+                    label="Driver"
+                    to="/fleet/drivers"
+                    title="View Driver"
+                  />
+                  <EntityLink
+                    id={order.vehicle_assigned_uuid || vehicleId}
+                    label="Vehicle"
+                    to="/fleet/vehicles"
+                    title="View Vehicle"
+                  />
                   <EntityLink id={vendorId} label="Vendor" to="/fleet/vendors" title="View Vendor" />
                   <EntityLink id={pickupPlaceId} label="Pickup Place" to="/fleet/places" title="View Pickup Place" />
                   <EntityLink id={dropPlaceId} label="Drop Place" to="/fleet/places" title="View Drop Place" />

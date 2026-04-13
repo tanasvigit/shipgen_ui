@@ -20,6 +20,7 @@ from app.models.contact import Contact
 from app.models.order import Order
 from app.models.user import User
 from app.schemas.contact import ContactCreate, ContactOut, ContactUpdate, ContactResponse, ContactsResponse
+from app.services.fleet_customer_contacts import sync_fleet_customer_contacts_for_company
 
 router = APIRouter(prefix="/fleetops/v1/contacts", tags=["fleetops-contacts"])
 
@@ -41,6 +42,7 @@ def _deny_driver_customer_access(current: User) -> None:
         )
 
 
+@router.get("", response_model=ContactsResponse)
 @router.get("/", response_model=ContactsResponse)
 def list_contacts(
     db: Session = Depends(get_db),
@@ -52,6 +54,8 @@ def list_contacts(
 ):
     _deny_driver_customer_access(current)
     company_uuid = _require_company_uuid(current)
+    if sync_fleet_customer_contacts_for_company(db, company_uuid) > 0:
+        db.commit()
     q = db.query(Contact).filter(Contact.company_uuid == company_uuid, Contact.deleted_at.is_(None))
     if kind:
         q = q.filter(Contact.type == kind)
@@ -84,6 +88,7 @@ def get_contact(
     return {"contact": contact}
 
 
+@router.post("", response_model=ContactResponse, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=ContactResponse, status_code=status.HTTP_201_CREATED)
 def create_contact(
     payload: ContactCreate,

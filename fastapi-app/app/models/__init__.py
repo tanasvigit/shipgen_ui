@@ -83,6 +83,7 @@ from app.models.schedule_constraint import ScheduleConstraint
 from app.models.group import Group
 from app.models.group_user import GroupUser
 from app.models.user_device import UserDevice
+from app.models.trip import Trip
 
 __all__ = [
     "Base",
@@ -171,6 +172,7 @@ __all__ = [
     "Group",
     "GroupUser",
     "UserDevice",
+    "Trip",
 ]
 
 

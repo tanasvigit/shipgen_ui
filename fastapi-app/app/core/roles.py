@@ -24,8 +24,11 @@ DRIVER = "DRIVER"
 # VIEWER: Internal read-only role for stakeholders (management, finance, support)
 # NOT for external customers - they use Storefront with separate auth
 VIEWER = "VIEWER"
+FLEET_CUSTOMER = "FLEET_CUSTOMER"
 
-ALL_ROLES: frozenset[str] = frozenset({ADMIN, OPERATIONS_MANAGER, DISPATCHER, DRIVER, VIEWER})
+ALL_ROLES: frozenset[str] = frozenset(
+    {ADMIN, OPERATIONS_MANAGER, DISPATCHER, DRIVER, VIEWER, FLEET_CUSTOMER}
+)
 
 STAFF_ORDER_MUTATORS = frozenset({ADMIN, OPERATIONS_MANAGER, DISPATCHER})
 

@@ -6,6 +6,7 @@ export enum UserRole {
   DRIVER = 'DRIVER',
   // VIEWER: Internal read-only role for stakeholders (NOT external customer)
   VIEWER = 'VIEWER',
+  FLEET_CUSTOMER = 'FLEET_CUSTOMER',
 }
 
 /**
@@ -23,6 +24,7 @@ const LEGACY_ROLE_MAP: Record<string, UserRole> = {
   FINANCE: UserRole.VIEWER,             // Internal finance team (read-only)
   // CUSTOMER role removed - external customers use Storefront, not internal dashboard
   DRIVER: UserRole.DRIVER,
+  FLEET_CUSTOMER: UserRole.FLEET_CUSTOMER,
 };
 
 /** Normalize API or legacy role strings to a logistics role. Missing/unknown → DISPATCHER. */

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 class ContactBase(BaseModel):
@@ -39,10 +39,12 @@ class ContactUpdate(BaseModel):
 
 
 class ContactOut(ContactBase):
-    id: Optional[int] = None
+    """Read model: `email` is plain str so invalid/legacy values in DB cannot break responses."""
 
-    class Config:
-        from_attributes = True
+    id: Optional[int] = None
+    email: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ContactResponse(BaseModel):

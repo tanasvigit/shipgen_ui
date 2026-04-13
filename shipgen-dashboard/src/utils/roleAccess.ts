@@ -30,6 +30,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.DISPATCHER]: 'full',
       [UserRole.DRIVER]: 'none',
       [UserRole.VIEWER]: 'read-only', // VIEWER can access Dashboard
+      [UserRole.FLEET_CUSTOMER]: 'none',
     },
   },
   {
@@ -40,6 +41,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.DISPATCHER]: 'full',
       [UserRole.DRIVER]: 'limited',
       [UserRole.VIEWER]: 'read-only', // VIEWER can access Orders & Customers
+      [UserRole.FLEET_CUSTOMER]: 'limited',
     },
   },
   {
@@ -50,6 +52,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.DISPATCHER]: 'none',
       [UserRole.DRIVER]: 'none',
       [UserRole.VIEWER]: 'none', // VIEWER cannot access Warehouse
+      [UserRole.FLEET_CUSTOMER]: 'none',
     },
   },
   {
@@ -60,6 +63,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.DISPATCHER]: 'read-only',
       [UserRole.DRIVER]: 'none',
       [UserRole.VIEWER]: 'read-only', // VIEWER can access Drivers, Vehicles, Fleet Dashboard
+      [UserRole.FLEET_CUSTOMER]: 'none',
     },
   },
   {
@@ -70,6 +74,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.DISPATCHER]: 'none',
       [UserRole.DRIVER]: 'none',
       [UserRole.VIEWER]: 'none', // VIEWER: hidden for now, will add later
+      [UserRole.FLEET_CUSTOMER]: 'none',
     },
   },
   {
@@ -80,6 +85,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.DISPATCHER]: 'read-only',
       [UserRole.DRIVER]: 'none',
       [UserRole.VIEWER]: 'none', // VIEWER: hidden for now, will add later
+      [UserRole.FLEET_CUSTOMER]: 'none',
     },
   },
   {
@@ -90,6 +96,7 @@ export const SECTION_ACCESS: SectionAccess[] = [
       [UserRole.DISPATCHER]: 'full',
       [UserRole.DRIVER]: 'none',
       [UserRole.VIEWER]: 'none', // VIEWER cannot access AI Assistant
+      [UserRole.FLEET_CUSTOMER]: 'none',
     },
   },
 ];
@@ -145,11 +152,16 @@ export function canDeleteOrders(role: UserRole): boolean {
 }
 
 export function canCreateOrders(role: UserRole): boolean {
-  return role === UserRole.ADMIN || role === UserRole.OPERATIONS_MANAGER || role === UserRole.DISPATCHER;
+  return (
+    role === UserRole.ADMIN ||
+    role === UserRole.OPERATIONS_MANAGER ||
+    role === UserRole.DISPATCHER ||
+    role === UserRole.FLEET_CUSTOMER
+  );
 }
 
 export function canEditOrders(role: UserRole): boolean {
-  return canCreateOrders(role);
+  return role === UserRole.ADMIN || role === UserRole.OPERATIONS_MANAGER || role === UserRole.DISPATCHER;
 }
 
 export function canAssignOrDispatchOrders(role: UserRole): boolean {
@@ -167,7 +179,7 @@ export function canDeleteDriverVehicleMasterData(role: UserRole): boolean {
 }
 
 export function canAccessCustomersModule(role: UserRole): boolean {
-  return role !== UserRole.DRIVER;
+  return role !== UserRole.DRIVER && role !== UserRole.FLEET_CUSTOMER;
 }
 
 export function isViewerReadOnly(role: UserRole): boolean {
@@ -196,6 +208,9 @@ const DISPATCHER_SIDEBAR_MODULE_IDS = new Set([
 ]);
 
 export function isSidebarModuleVisibleForRole(role: UserRole, moduleId: string): boolean {
+  if (role === UserRole.FLEET_CUSTOMER) {
+    return moduleId === 'logistics';
+  }
   if (role === UserRole.VIEWER) {
     return VIEWER_SIDEBAR_MODULE_IDS.has(moduleId);
   }
@@ -293,6 +308,15 @@ export function canAccessRoute(role: UserRole, path: string): boolean {
     return false;
   }
 
+  if (role === UserRole.FLEET_CUSTOMER) {
+    // Customer portal is intentionally minimal: own order requests + profile only.
+    if (normalizedPath === 'profile') return true;
+    if (normalizedPath === 'logistics' || normalizedPath === 'logistics/orders' || normalizedPath.startsWith('logistics/orders/')) {
+      return !normalizedPath.includes('dispatch-board');
+    }
+    return false;
+  }
+
   if (normalizedPath === 'analytics/users' || normalizedPath.startsWith('analytics/users/')) {
     return role === UserRole.ADMIN;
   }
@@ -349,6 +373,8 @@ export function getRoleDisplayLabel(role: UserRole | string): string {
       return 'Driver';
     case UserRole.VIEWER:
       return 'Viewer (Read-only)';
+    case UserRole.FLEET_CUSTOMER:
+      return 'Fleet Customer';
     default:
       return role as string;
   }
