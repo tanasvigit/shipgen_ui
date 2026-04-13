@@ -3,7 +3,7 @@ import React from 'react';
 const cn = (...c: Array<string | false | undefined>) => c.filter(Boolean).join(' ');
 
 export interface FormFieldProps {
-  label: string;
+  label: React.ReactNode;
   required?: boolean;
   children: React.ReactNode;
   error?: string | null;
