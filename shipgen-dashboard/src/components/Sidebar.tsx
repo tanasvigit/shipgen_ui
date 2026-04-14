@@ -68,6 +68,7 @@ const moduleItems: ModuleItem[] = [
     to: '/logistics/orders',
     children: [
       { id: 'orders', label: 'Orders', to: '/logistics/orders' },
+      { id: 'trips-dispatch', label: 'Trips & Dispatch', to: '/logistics/trips' },
       { id: 'dispatch-board', label: 'Dispatcher Board', to: '/logistics/orders/dispatch-board' },
       { id: 'customers', label: 'Customers', to: '/logistics/customers' },
     ],

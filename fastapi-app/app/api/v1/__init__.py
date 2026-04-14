@@ -101,6 +101,7 @@ from app.api.v1.routers import (
     onboard,
     registry,
     me,
+    trips_dispatch,
 )
 
 router = APIRouter()
@@ -110,6 +111,7 @@ router.include_router(users.router)
 router.include_router(companies.router)
 router.include_router(fleetops_orders.router)
 router.include_router(fleet_customer_orders.router)
+router.include_router(trips_dispatch.router)
 router.include_router(fleetops_order_flow.router)
 router.include_router(driver_portal.router)
 router.include_router(fleetops_drivers.router)

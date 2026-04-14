@@ -8,6 +8,7 @@ const LogisticsLayout: React.FC = () => {
   const location = useLocation();
   const isEmbedded = new URLSearchParams(location.search).get('embed') === '1';
   const subNavItems = [
+    { path: '/logistics/trips', label: 'Trips & Dispatch', exact: true },
     {
       path: '/logistics/orders/dispatch-board',
       label: 'Dispatcher Board',

@@ -13,3 +13,14 @@ How to Run Frontend:---
 npm install
 npm run dev
 npm run build(optional it for build)
+
+
+
+
+prasanth
+
+Remove-Item -Recurse -Force venv
+python -m venv venv
+venv\Scripts\activate
+python -m pip install fastapi uvicorn sqlalchemy psycopg2-binary redis pydantic-settings python-jose passlib[bcrypt] email-validator python-multipart pytz python-whois feedparser alembic python-dotenv
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000

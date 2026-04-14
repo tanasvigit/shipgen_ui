@@ -237,6 +237,7 @@ function isViewerAllowedNavPath(normalizedPath: string): boolean {
     if (normalizedPath.includes('dispatch-board')) return false;
     if (normalizedPath === 'logistics' || normalizedPath.startsWith('logistics/orders')) return true;
     if (normalizedPath.startsWith('logistics/customers')) return true;
+    if (normalizedPath.startsWith('logistics/trips')) return true;
     return false;
   }
 
@@ -264,6 +265,7 @@ function isDispatcherAllowedNavPath(normalizedPath: string): boolean {
   if (normalizedPath === 'logistics' || normalizedPath.startsWith('logistics/')) {
     if (normalizedPath === 'logistics' || normalizedPath.startsWith('logistics/orders')) return true;
     if (normalizedPath.startsWith('logistics/customers')) return true;
+    if (normalizedPath.startsWith('logistics/trips')) return true;
     return false;
   }
 

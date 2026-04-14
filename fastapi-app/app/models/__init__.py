@@ -84,6 +84,7 @@ from app.models.group import Group
 from app.models.group_user import GroupUser
 from app.models.user_device import UserDevice
 from app.models.trip import Trip
+from app.models.trips_dispatch import DispatchTrip, DispatchTripEvent, DispatchTripOrder, DispatchTripStop
 
 __all__ = [
     "Base",
@@ -173,6 +174,10 @@ __all__ = [
     "GroupUser",
     "UserDevice",
     "Trip",
+    "DispatchTrip",
+    "DispatchTripEvent",
+    "DispatchTripOrder",
+    "DispatchTripStop",
 ]
 
 

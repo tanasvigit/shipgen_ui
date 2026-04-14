@@ -31,6 +31,7 @@ import DashboardOverview from './components/Dashboard/DashboardOverview';
 // Orders Sub-pages
 import LogisticsLayout from './components/Logistics/LogisticsLayout';
 import CustomersList from './components/Logistics/CustomersList';
+import TripsDispatch from './components/Logistics/TripsDispatch';
 import OrdersWrapper from './components/Orders/OrdersWrapper';
 import OrdersList from './components/Orders/OrdersList';
 import OrderDetail from './components/Orders/OrderDetail';
@@ -699,6 +700,7 @@ const App: React.FC = () => {
               <Route path=":id" element={<OrderDetail />} />
             </Route>
             <Route path="customers" element={<CustomersList />} />
+            <Route path="trips" element={<TripsDispatch />} />
             <Route path="customers/new" element={<Navigate to="/logistics/customers" replace />} />
             <Route path="customers/:id/edit" element={<Navigate to="/logistics/customers" replace />} />
             <Route index element={<Navigate to="/logistics/orders" replace />} />
